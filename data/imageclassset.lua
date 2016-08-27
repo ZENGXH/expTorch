@@ -21,28 +21,36 @@ function ImageClassSet:__init(config)
       'A DataSet for images in a flat folder structure',
       {arg='data_path', type='table | string', req=true,
        help='one or many paths of directories with images'},
+
       {arg='load_size', type='table', req=true,
        help='a size to load the images to, initially'},
+
       {arg='sample_size', type='table',
        help='a consistent sample size to resize the images. '..
        'Defaults to load_size'},
+
       {arg='sample_func', type='string | function', default='sampleDefault',
        help='function f(self, dst, path) used to create a sample(s) from '..
        'an image path. Stores them in dst. Strings "sampleDefault", '..
        '"sampleTrain" or "sampleTest" can also be provided as they '..
        'refer to existing functions'},
+
       {arg='which_set', type='string', default='train',
        help='"train", "valid" or "test" set'},
+
       {arg='verbose', type='boolean', default=true,
        help='display verbose messages'},
+
       {arg='sort_func', type='function', 
        help='comparison operator used for sorting class dir to get idx.'
        ..' Defaults to < operator'},
+
       {arg='cache_mode', type='string', default='writeonce',
        help='writeonce : read from cache if exists, else write to cache. '..
        'overwrite : write to cache, regardless if exists. '..
        'nocache : dont read or write from cache. '..
        'readonly : only read from cache, fail otherwise.'},
+
       {arg='cache_path', type='string', 
        help='Path to cache. Defaults to [data_path[1]]/cache.th7'}
    )

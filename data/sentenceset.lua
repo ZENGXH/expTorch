@@ -28,20 +28,26 @@ function SentenceSet:__init(config)
       'words. Each word is represented as an integer.',
       {arg='which_set', type='string',
        help='"train", "valid" or "test" set'},
+
       {arg='data', type='torch.Tensor', 
        help='A torch.tensor with 2 columns. First col is for storing '..
        'start indices of sentences. Second col is for storing the '..
        'sequence of words as shuffled sentences. Sentences are '..
        'only seperated by the sentence_end delimiter.', req=true},
+
       {arg='context_size', type='number', default=5,
        help='number of previous words to be used to predict the next.'},
+
       {arg='recurrent', type='number', default=false,
        help='For RNN training, set this to true. In which case, '..
        'outputs a target word for each input word'},
+
       {arg='end_id', type='number', req=true,
        help='word_id of the sentence end delimiter : "</S>"'},
+      
       {arg='start_id', type='number', req=true,
        help='word_id of the sentence start delimiter : "<S>"'},
+      
       {arg='words', type='table',
        help='A table mapping word_ids to the original word strings'}
    )

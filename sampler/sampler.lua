@@ -14,13 +14,17 @@ function Sampler:__init(config)
       'Sampler', 
       'Samples batches from a set of examples in a dataset. '..
       'Iteration ends after an epoch (sampler-dependent) ',
+
       {arg='batch_size', type='number', default=128,
        help='Number of examples per sampled batches'},
+
       {arg='epoch_size', type='number', default=-1,
        help='Number of examples presented per epoch. '..
        'Default is to use then entire dataset per epoch'},
+
       {arg='ppf', type='function', 
        help='a function that preprocesses a Batch into another Batch'},
+
       {arg='gc_freq', type='number', default=50,
        help='collectgarbage() every gc_freq batches'}
    )
@@ -47,9 +51,11 @@ function Sampler:setup(config)
       'Iteration ends after an epoch (sampler-dependent) ',
       {arg='batch_size', type='number', default=128,
        help='Number of examples per sampled batches'},
+
       {arg='overwrite', type='boolean', default=false,
        help='overwrite existing values if not nil.' .. 
        'If nil, initialize whatever the value of overwrite.'},
+
       {arg='mediator', type='dp.Mediator',
        help='used for communication between objects'}
    )
@@ -176,15 +182,13 @@ function Sampler:sampleEpochAsync(dataset)
          return batch, math.min(nSampledGet, epochSize), epochSize
       end
    end
-   
    assert(dataset.isAsync, "expecting asynchronous dataset")
    -- empty the async queue
    dataset:synchronize()
    -- fill task queue with some batch requests
-   for tidx=1,dataset.nThread do
+   for tidx=1, dataset.nThread do
       sampleBatch(nil, true)
    end
-   
    return sampleBatch
 end
 

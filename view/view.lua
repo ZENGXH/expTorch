@@ -66,6 +66,7 @@ function View:backwardGet(view, tensor_type)
    error"Not Implemented"
 end
 
+-- This method return the index of axis_char in string view
 function View:findAxis(axis_char, view)
    view = view or self._view
    local axis_pos = view:find(axis_char)

@@ -2,6 +2,7 @@
 --[[ DataView ]]-- 
 -- Allows for efficiently communicating tensors between Models.
 -- Exists at the output of a Model or a DataSource
+-- provide b() and bf() view, others can be found in the sub-class
 ------------------------------------------------------------------------
 local DataView, parent = torch.class("dp.DataView", "dp.View")
 DataView.isDataView = true
@@ -21,9 +22,29 @@ end
 -- the most expanded size of the orignal data. For example, an image
 -- batch would be forwarded with its 4 dimensions, and never with 
 -- collapses dimensions (2D). 
+-- @para view string describe the input(tensor) dimension information
+-- @para input
+-- fill self._tensors table(inherit from dp.View)
+-- self._tensors = 
+--  {
+--      ['bchw'] = 
+--          { 
+--              ['torch.DoubleTensor'] = input
+--          }
+--  }
+-- self._modules = 
+--  {
+--      ['bchw'] = 
+--          {
+--              nn.Identity(),
+--              {
+--                  ['torch.DoubleTensor'] = nn.Identity()
+--              }
+--          }
+--  }
 function DataView:forwardPut(view, input)
    -- store input for later use
-   self._dim = #view
+   self._dim = #view -- eg #'bhwc' = 4
    if input:dim() ~= self._dim then
       error("view has more axes than input has dims", 3)
    end
@@ -41,6 +62,7 @@ function DataView:forwardPut(view, input)
       self._modules = {
          [view] = {nn.Identity(), {[self._type] = nn.Identity()}}
       }
+      -- self_modules = {['bcwh']: {nn.Identity(), {'CudaTensor'=nn.Identity()}}
    end
 end
    
@@ -51,11 +73,13 @@ function DataView:forwardGet(view, tensor_type)
    -- retrieve a viewTable
    local viewTable = self._tensors[view]
    if not viewTable then
+      -- no such view in self._tensors table
       -- no viewTable: get tensor from module
       return self:tensorFromModule(view, tensor_type)
    end
    local tensor = viewTable[tensor_type]
    if not tensor then
+      -- no such tensor_type in the view of self._tensors table
       return self:tensorFromModule(view, tensor_type)
    end
    return tensor
@@ -66,13 +90,16 @@ function DataView:tensorFromModule(view, tensor_type)
    local viewTable = self._tensors[view] or {}
    local input_type = torch.typename(self._input)
    local moduleTable = self._modules[view]
+
    if not moduleTable then
       -- no moduleTable: build a module
       local modula = self[view](self)
       -- make sure it accepts the right input type
       modula:type(self._type)
       local copy = nn.Copy(input_type, tensor_type)
+
       self._modules[view] = {modula, {[tensor_type] = copy}}
+      
       local tensor = modula:forward(self._input)
       viewTable[input_type] = tensor
       tensor = copy:forward(tensor)
@@ -80,16 +107,19 @@ function DataView:tensorFromModule(view, tensor_type)
       self._tensors[view] = viewTable
       return tensor
    end
-   local modula, copyTable = unpack(moduleTable)
+
+   local modula, copierTable = unpack(moduleTable)
    local tensor = modula:forward(self._input)
    viewTable[input_type] = tensor
-   local copy = copyTable[tensor_type]
-   if not copy then
-      -- no copy : build copy module
-      copy = nn.Copy(input_type, tensor_type)
-      copyTable[tensor_type] = copy
+   local copier = copierTable[tensor_type]
+
+   if not copier then
+      -- no copier : build copier module
+      copier = nn.Copy(input_type, tensor_type)
+      copierTable[tensor_type] = copier
    end
-   tensor = copy:forward(tensor)
+   
+   tensor = copier:forward(tensor)
    viewTable[tensor_type] = tensor
    self._tensors[view] = viewTable
    return tensor
@@ -170,7 +200,8 @@ end
 function DataView:bf()
    local view, dim = self._view, self._dim
    local b_pos = self:findAxis('b', view)
-   -- was b
+
+   -- was b originally
    if dim == 1 then
       if self._warn then
          print("DataView:feature Warning: provided data has one "..
@@ -178,8 +209,10 @@ function DataView:bf()
       end
       return nn.Reshape(1)
    end
+
    -- was b...
    local modula
+   -- make batchSize as the first dimention
    if b_pos ~= 1 then
       modula = nn.Transpose({1, b_pos})
    end
@@ -188,17 +221,17 @@ function DataView:bf()
       local reshape = nn.Reshape(self:sampleSize(b_pos))
       if transpose then
          modula = nn.Sequential()
-         modula:add(transpose)
-         modula:add(reshape)
+         modula:add(transpose) -- make batchSize in first dimen
+         modula:add(reshape) -- reshape all feature in one line
       else
-         modula = reshape
+         modula = reshape -- batchSize in first dimen already
       end
    end
    return modula or nn.Identity()
 end
 
 -- vector view. 
--- Only works with bf with size(f) is 1
+-- Only works with 'bf' with size(f) is 1 or 'b'
 function DataView:b()
    local view, dim = self._view, self._dim
    local b_pos = self:findAxis('b', view)
@@ -226,15 +259,21 @@ function DataView:modulePut(fwd_module, view, tensor_type)
    self._put = true
    local viewTable = self._module_graph[view]
    if not viewTable then
+      -- create a viewTable for view, init a fwd_module for tensor_type
+      -- put the viewTable in to self._module_graph
       viewTable = {[tensor_type] = {fwd_module}}
       self._module_graph[view] = viewTable
       return
    end
    local moduleList = viewTable[tensor_type]
    if not moduleList then
+      -- create fwd_module for tensor_type
       viewTable[tensor_type] = {fwd_module}
       return
    end
+   -- already have viewTable for [view] in self._module_graph
+   -- already have a fwd_module for the [tensor_type] in the viewTable
+   -- append the additional fwd_module to the list
    table.insert(moduleList, fwd_module)
 end
 
@@ -330,11 +369,12 @@ end
 ---------------------- MISC ----------------------------
 
 -- number of features in each sample
+-- multiply all size of self._input except batchSize
 function DataView:sampleSize(b_pos, view, data)
    b_pos = b_pos or self:findAxis('b', view)
    data = data or self._input
    local size = 1
-   for i=1,data:dim() do
+   for i=1, data:dim() do
       if i ~= b_pos then
          size = size * self._input:size(i)
       end
@@ -474,7 +514,7 @@ function DataView:input(input)
    return self._input
 end
 
--- a generic function for transposing views
+-- a generic function for transposing views from self._view
 function DataView:transpose(new_view)
    local view = _.split(self._view)
    local transpositions = {}

@@ -47,6 +47,9 @@ function DataSource:__init(config)
    self:preprocess()
 end
 
+-- exameple usage:  getView('train', 'input')
+-- return View and DataSet
+-- 
 function DataSource:getView(which_set, attribute)
    which_set = which_set or 'train'
    attribute = attribute or 'input'
@@ -78,6 +81,7 @@ end
 -- ds:[train,valid,test]Set():[inputs,targets]():forward(view, tensor_type).
 -- all attributes are optional.
 -- example usage : get('train', 'input', 'bchw', 'float')
+-- return tenfor in-view, View, Dataset
 function DataSource:get(which_set, attribute, view, type)
    view = view or 'default'
    local dataview, dataset = self:getView(which_set, attribute)
