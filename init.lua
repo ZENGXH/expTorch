@@ -1,5 +1,5 @@
 require 'nnx'
-require 'dpnn'
+require 'dprnnnn'
 require 'string'
 _ = require 'moses'
 require 'xlua'
@@ -11,129 +11,129 @@ require 'torchx'
 ffi = require 'ffi'
 
 ------------------------------------------------------------------------
---[[ dp ]]--
+--[[ dprnn ]]--
 -- deep learning library for torch7.
 ------------------------------------------------------------------------
 
-dp = {}
-dp.TORCH_DIR = os.getenv('TORCH_DATA_PATH') or os.getenv('HOME')
+dprnn = {}
+dprnn.TORCH_DIR = os.getenv('TORCH_DATA_PATH') or os.getenv('HOME')
    
 --[[ utils ]]--
-torch.include('dp', 'utils/utils.lua')
-torch.include('dp', 'utils/underscore.lua')
-torch.include('dp', 'utils/os.lua')
-torch.include('dp', 'utils/table.lua')
-torch.include('dp', 'utils/torch.lua')
+torch.include('dprnn', 'utils/utils.lua')
+torch.include('dprnn', 'utils/underscore.lua')
+torch.include('dprnn', 'utils/os.lua')
+torch.include('dprnn', 'utils/table.lua')
+torch.include('dprnn', 'utils/torch.lua')
 
 --[[ directory structure ]]--
-dp.DATA_DIR = os.getenv('DEEP_DATA_PATH') 
-   or paths.concat(dp.TORCH_DIR, 'data')
-dp.mkdir(dp.DATA_DIR)
+dprnn.DATA_DIR = os.getenv('DEEP_DATA_PATH') 
+   or paths.concat(dprnn.TORCH_DIR, 'data')
+dprnn.mkdir(dp.DATA_DIR)
 
-dp.SAVE_DIR = os.getenv('DEEP_SAVE_PATH') 
-   or paths.concat(dp.TORCH_DIR, 'save')
-dp.mkdir(dp.SAVE_DIR)
+dprnn.SAVE_DIR = os.getenv('DEEP_SAVE_PATH') 
+   or paths.concat(dprnn.TORCH_DIR, 'save')
+dprnn.mkdir(dp.SAVE_DIR)
 
-dp.LOG_DIR = os.getenv('DEEP_LOG_PATH') 
-   or paths.concat(dp.TORCH_DIR, 'log')
-dp.mkdir(dp.LOG_DIR)
+dprnn.LOG_DIR = os.getenv('DEEP_LOG_PATH') 
+   or paths.concat(dprnn.TORCH_DIR, 'log')
+dprnn.mkdir(dp.LOG_DIR)
 
-dp.UNIT_DIR = os.getenv('DEEP_UNIT_PATH') 
-   or paths.concat(dp.TORCH_DIR, 'unit')
-dp.mkdir(dp.UNIT_DIR)
+dprnn.UNIT_DIR = os.getenv('DEEP_UNIT_PATH') 
+   or paths.concat(dprnn.TORCH_DIR, 'unit')
+dprnn.mkdir(dp.UNIT_DIR)
    
 --[[ misc ]]--
-torch.include('dp', 'xplog.lua')
-torch.include('dp', 'mediator.lua')
-torch.include('dp', 'objectid.lua')
+torch.include('dprnn', 'xplog.lua')
+torch.include('dprnn', 'mediator.lua')
+torch.include('dprnn', 'objectid.lua')
 
 --[[ view ]]--
-torch.include('dp', 'view/view.lua')
-torch.include('dp', 'view/dataview.lua')
-torch.include('dp', 'view/imageview.lua')
-torch.include('dp', 'view/classview.lua')
-torch.include('dp', 'view/sequenceview.lua')
-torch.include('dp', 'view/listview.lua')
+torch.include('dprnn', 'view/view.lua')
+torch.include('dprnn', 'view/dataview.lua')
+torch.include('dprnn', 'view/imageview.lua')
+torch.include('dprnn', 'view/classview.lua')
+torch.include('dprnn', 'view/sequenceview.lua')
+torch.include('dprnn', 'view/listview.lua')
 
 --[[ dataset ]]--
 -- datasets
-torch.include('dp', 'data/baseset.lua') -- abstract class
-torch.include('dp', 'data/dataset.lua')
-torch.include('dp', 'data/sentenceset.lua')
-torch.include('dp', 'data/textset.lua')
-torch.include('dp', 'data/imageclassset.lua')
-torch.include('dp', 'data/batch.lua')
+torch.include('dprnn', 'data/baseset.lua') -- abstract class
+torch.include('dprnn', 'data/dataset.lua')
+torch.include('dprnn', 'data/sentenceset.lua')
+torch.include('dprnn', 'data/textset.lua')
+torch.include('dprnn', 'data/imageclassset.lua')
+torch.include('dprnn', 'data/batch.lua')
 
 --[[ datasource ]]--
 -- generic datasources
-torch.include('dp', 'data/datasource.lua')
-torch.include('dp', 'data/imagesource.lua')
-torch.include('dp', 'data/smallimagesource.lua')
-torch.include('dp', 'data/textsource.lua')
+torch.include('dprnn', 'data/datasource.lua')
+torch.include('dprnn', 'data/imagesource.lua')
+torch.include('dprnn', 'data/smallimagesource.lua')
+torch.include('dprnn', 'data/textsource.lua')
 -- specific image datasources
-torch.include('dp', 'data/mnist.lua')
-torch.include('dp', 'data/cifar10.lua')
-torch.include('dp', 'data/cifar100.lua')
-torch.include('dp', 'data/notmnist.lua')
-torch.include('dp', 'data/facialkeypoints.lua')
-torch.include('dp', 'data/svhn.lua')
-torch.include('dp', 'data/imagenet.lua')
-torch.include('dp', 'data/facedetection.lua')
-torch.include('dp', 'data/translatedmnist.lua')
+torch.include('dprnn', 'data/mnist.lua')
+torch.include('dprnn', 'data/cifar10.lua')
+torch.include('dprnn', 'data/cifar100.lua')
+torch.include('dprnn', 'data/notmnist.lua')
+torch.include('dprnn', 'data/facialkeypoints.lua')
+torch.include('dprnn', 'data/svhn.lua')
+torch.include('dprnn', 'data/imagenet.lua')
+torch.include('dprnn', 'data/facedetection.lua')
+torch.include('dprnn', 'data/translatedmnist.lua')
 -- specific text datasources
-torch.include('dp', 'data/billionwords.lua')
-torch.include('dp', 'data/penntreebank.lua')
+torch.include('dprnn', 'data/billionwords.lua')
+torch.include('dprnn', 'data/penntreebank.lua')
 
 --[[ sampler ]]--
-torch.include('dp', 'sampler/sampler.lua')
-torch.include('dp', 'sampler/shufflesampler.lua')
-torch.include('dp', 'sampler/sentencesampler.lua')
-torch.include('dp', 'sampler/randomsampler.lua')
-torch.include('dp', 'sampler/textsampler.lua')
+torch.include('dprnn', 'sampler/sampler.lua')
+torch.include('dprnn', 'sampler/shufflesampler.lua')
+torch.include('dprnn', 'sampler/sentencesampler.lua')
+torch.include('dprnn', 'sampler/randomsampler.lua')
+torch.include('dprnn', 'sampler/textsampler.lua')
 
 --[[ preprocess ]]--
-torch.include('dp', 'preprocess/preprocess.lua')
-torch.include('dp', 'preprocess/pipeline.lua')
-torch.include('dp', 'preprocess/parallelpreprocess.lua')
-torch.include('dp', 'preprocess/binarize.lua')
-torch.include('dp', 'preprocess/standardize.lua')
-torch.include('dp', 'preprocess/gcn.lua')
-torch.include('dp', 'preprocess/zca.lua')
-torch.include('dp', 'preprocess/lecunlcn.lua')
+torch.include('dprnn', 'preprocess/preprocess.lua')
+torch.include('dprnn', 'preprocess/pipeline.lua')
+torch.include('dprnn', 'preprocess/parallelpreprocess.lua')
+torch.include('dprnn', 'preprocess/binarize.lua')
+torch.include('dprnn', 'preprocess/standardize.lua')
+torch.include('dprnn', 'preprocess/gcn.lua')
+torch.include('dprnn', 'preprocess/zca.lua')
+torch.include('dprnn', 'preprocess/lecunlcn.lua')
 
 --[[ propagator ]]--
-torch.include('dp', 'propagator/propagator.lua')
-torch.include('dp', 'propagator/optimizer.lua')
-torch.include('dp', 'propagator/evaluator.lua')
-torch.include('dp', 'propagator/experiment.lua')
+torch.include('dprnn', 'propagator/propagator.lua')
+torch.include('dprnn', 'propagator/optimizer.lua')
+torch.include('dprnn', 'propagator/evaluator.lua')
+torch.include('dprnn', 'propagator/experiment.lua')
 
 --[[ feedback ]]--
-torch.include('dp', 'feedback/feedback.lua')
-torch.include('dp', 'feedback/compositefeedback.lua')
-torch.include('dp', 'feedback/confusion.lua')
-torch.include('dp', 'feedback/perplexity.lua')
-torch.include('dp', 'feedback/topcrop.lua')
-torch.include('dp', 'feedback/fkdkaggle.lua')
-torch.include('dp', 'feedback/facialkeypointfeedback.lua')
+torch.include('dprnn', 'feedback/feedback.lua')
+torch.include('dprnn', 'feedback/compositefeedback.lua')
+torch.include('dprnn', 'feedback/confusion.lua')
+torch.include('dprnn', 'feedback/perplexity.lua')
+torch.include('dprnn', 'feedback/topcrop.lua')
+torch.include('dprnn', 'feedback/fkdkaggle.lua')
+torch.include('dprnn', 'feedback/facialkeypointfeedback.lua')
 
 --[[ observer ]]--
-torch.include('dp', 'observer/observer.lua')
-torch.include('dp', 'observer/compositeobserver.lua')
-torch.include('dp', 'observer/logger.lua')
-torch.include('dp', 'observer/errorminima.lua')
-torch.include('dp', 'observer/earlystopper.lua')
-torch.include('dp', 'observer/savetofile.lua') --not an observer (but used in one)
-torch.include('dp', 'observer/adaptivedecay.lua')
-torch.include('dp', 'observer/filelogger.lua')
-torch.include('dp', 'observer/hyperlog.lua')
+torch.include('dprnn', 'observer/observer.lua')
+torch.include('dprnn', 'observer/compositeobserver.lua')
+torch.include('dprnn', 'observer/logger.lua')
+torch.include('dprnn', 'observer/errorminima.lua')
+torch.include('dprnn', 'observer/earlystopper.lua')
+torch.include('dprnn', 'observer/savetofile.lua') --not an observer (but used in one)
+torch.include('dprnn', 'observer/adaptivedecay.lua')
+torch.include('dprnn', 'observer/filelogger.lua')
+torch.include('dprnn', 'observer/hyperlog.lua')
 
 --[[ nn ]]--
-torch.include('dp', 'nn/Print.lua')
-torch.include('dp', 'nn/FairLookupTable.lua')
+torch.include('dprnn', 'nn/Print.lua')
+torch.include('dprnn', 'nn/FairLookupTable.lua')
 
 --[[ test ]]--
-torch.include('dp', 'test/test.lua')
-torch.include('dp', 'test/test-cuda.lua')
-torch.include('dp', 'test/test-datasets.lua')
+torch.include('dprnn', 'test/test.lua')
+torch.include('dprnn', 'test/test-cuda.lua')
+torch.include('dprnn', 'test/test-datasets.lua')
 
-return dp
+return dprnn
