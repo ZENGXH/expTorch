@@ -30,15 +30,20 @@ function Batch:setup(config)
       {config},
       'Batch:setup', 
       'post-construction setup. Usually performed by Sampler.',
+      
       {arg='batch_iter', type='number',
        help='Count of the number of examples seen so far. Used to '..
        'update progress bar. Shouldn\'t be larger than epoch_size.'}, 
+
       {arg='batch_size', type='number',
        help='Maximum number of examples in batch.'},
+
       {arg='n_sample', type='number',
        help='hardcode the number of examples'},
+
       {arg='indices', type='torch.Tensor', 
        help='indices of the examples in the original dataset.'},
+
       {arg='epoch_size', type='number', default=self._epoch_size,
        help='number of samples in epoch dataset.'}
    )

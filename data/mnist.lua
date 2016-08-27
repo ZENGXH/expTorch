@@ -8,7 +8,7 @@ Mnist.isMnist = true
 
 Mnist._name = 'mnist'
 Mnist._image_size = {28, 28, 1}
-Mnist._image_axes = 'bhwc'
+Mnist._image_axes = 'bhwc' -- #Mnisi._image_axes = 4 == dim
 Mnist._feature_size = 1*28*28
 Mnist._classes = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
@@ -28,44 +28,61 @@ function Mnist:__init(config)
       'Note: Train and valid sets are already shuffled.',
       {arg='valid_ratio', type='number', default=1/6,
        help='proportion of training set to use for cross-validation.'},
+
       {arg='train_file', type='string', default='train.th7',
        help='name of training file'},
+
       {arg='test_file', type='string', default='test.th7',
        help='name of test file'},
+
       {arg='data_path', type='string', default=dp.DATA_DIR,
        help='path to data repository'},
+
       {arg='scale', type='table', 
        help='bounds to scale the values between. [Default={0,1}]'},
+
       {arg='binarize', type='boolean', 
        help='binarize the inputs (0s and 1s)', default=false},
+
       {arg='shuffle', type='boolean', 
        help='shuffle different sets', default=false},
+
       {arg='download_url', type='string',
        default='https://stife076.files.wordpress.com/2015/02/mnist4.zip',
        help='URL from which to download dataset if not found on disk.'},
+
       {arg='load_all', type='boolean', 
        help='Load all datasets : train, valid, test.', default=true},
+
       {arg='input_preprocess', type='table | dp.Preprocess',
        help='to be performed on set inputs, measuring statistics ' ..
        '(fitting) on the train_set only, and reusing these to ' ..
        'preprocess the valid_set and test_set.'},
+
       {arg='target_preprocess', type='table | dp.Preprocess',
        help='to be performed on set targets, measuring statistics ' ..
        '(fitting) on the train_set only, and reusing these to ' ..
        'preprocess the valid_set and test_set.'}  
+
    )
    if (self._scale == nil) then
       self._scale = {0,1}
    end
+
    if load_all then
       self:loadTrainValid()
       self:loadTest()
    end
-   DataSource.__init(self, {
-      train_set=self:trainSet(), valid_set=self:validSet(),
-      test_set=self:testSet(), input_preprocess=input_preprocess,
+
+   DataSource.__init(
+    self, {
+      train_set=self:trainSet(), 
+      valid_set=self:validSet(),
+      test_set=self:testSet(), 
+      input_preprocess=input_preprocess,
       target_preprocess=target_preprocess
-   })
+    }
+   )
 end
 
 function Mnist:loadTrainValid()
@@ -75,7 +92,8 @@ function Mnist:loadTrainValid()
    -- train
    local start = 1
    local size = math.floor(data[1]:size(1)*(1-self._valid_ratio))
-   self:trainSet(
+   self:trainSet
+   (
       self:createDataSet(
          data[1]:narrow(1, start, size), data[2]:narrow(1, start, size), 
          'train'
@@ -99,6 +117,10 @@ end
 
 function Mnist:loadTest()
    local test_data = self:loadData(self._test_file, self._download_url)
+   --{
+   --  1 : FloatTensor - size: 10000x28x28x1
+   --  2 : FloatTensor - size: 10000
+   --}
    self:testSet(
       self:createDataSet(test_data[1], test_data[2], 'test')
    )
@@ -122,18 +144,26 @@ function Mnist:createDataSet(inputs, targets, which_set)
    targets:add(1)
    -- construct inputs and targets dp.Views 
    local input_v, target_v = dp.ImageView(), dp.ClassView()
+   -- inputs can be something like FloatTensor - size: 10000x28x28x1
+   -- targets can be FloatTensor - size: 10000
    input_v:forward(self._image_axes, inputs)
    target_v:forward('b', targets)
    target_v:setClasses(self._classes)
    -- construct dataset
-   local ds = dp.DataSet{inputs=input_v,targets=target_v,which_set=which_set}
+   local ds = dp.DataSet{
+      inputs=input_v,
+      targets=target_v,
+      which_set=which_set
+    }
    ds:ioShapes('bhwc', 'b')
    return ds
 end
 
 function Mnist:loadData(file_name, download_url)
-   local path = DataSource.getDataPath{
-      name=self._name, url=download_url, 
+   local path = DataSource.getDataPath
+   {
+      name=self._name, 
+      url=download_url, 
       decompress_file=file_name, 
       data_dir=self._data_path
    }
