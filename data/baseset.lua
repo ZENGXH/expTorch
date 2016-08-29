@@ -7,11 +7,12 @@ BaseSet.isBaseSet = true
 
 function BaseSet:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, which_set, inputs, targets
+   local args, name, which_set, inputs, targets
       = xlua.unpack(
       {config},
       'BaseSet', 
       'Base class inherited by DataSet and Batch.',
+      {arg='name', type='string', default=' ', help='name of the set'},
       {arg='which_set', type='string',
        help='"train", "valid" or "test" set'},
       {arg='inputs', type='dp.View | table of dp.Views', 
@@ -24,6 +25,9 @@ function BaseSet:__init(config)
        'to a ListView. The indices of examples must be '..
        'in both inputs and targets must be aligned.'}
    )
+
+   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log.SetLoggerName(name)
    self:whichSet(which_set)
    if inputs then self:inputs(inputs) end
    if targets then self:targets(targets) end
@@ -56,18 +60,24 @@ end
 -- get/set input dp.View
 function BaseSet:inputs(inputs)
    if inputs then
+      self.log.tracefrom('set dataView: inputs')
       assert(inputs.isView, "Error : invalid inputs. Expecting type dp.View")
       self._inputs = inputs
    end
+   self.log.tracefrom('request dataView: inputs')
+   if(not self._inputs) then self.log.trace('\t get nil') end
    return self._inputs
 end
 
 -- get/set target dp.View
 function BaseSet:targets(targets)
    if targets then
+      self.log.trace('set dataView: targets')
       assert(targets.isView, "Error : invalid targets. Expecting type dp.View")
       self._targets = targets
    end
+   self.log.trace('request dataView: targets')
+   if(not self._targets) then self.log.trace('\t get nil') end
    return self._targets
 end
 

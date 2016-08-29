@@ -9,6 +9,8 @@ local Batch, parent = torch.class("dp.Batch", "dp.BaseSet")
 Batch.isBatch = true
 
 function Batch:__init(config)
+   if not config.name then config.name='batch' end
+   parent.__init(self, config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args, epoch_size = xlua.unpack(
       {config},

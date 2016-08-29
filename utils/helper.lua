@@ -1,5 +1,5 @@
 local helper = {}
-local log = loadfile('util/log.lua')()
+local log = loadfile('utils/log.lua')()
 
 function helper.WeightInitUniform(net, v)
     local v = v or 0.01
