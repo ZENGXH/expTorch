@@ -71,20 +71,26 @@ function Experiment:setup()
    self._mediator:subscribe("doneExperiment", self, "doneExperiment")
    if self._optimizer then
       self._optimizer:setup{
-         mediator=self._mediator, id=self:id():create('optimizer'),
-         model=self._model, target_module=self._target_module
+         mediator=self._mediator, 
+         id=self:id():create('optimizer'),
+         model=self._model, 
+         target_module=self._target_module
       }
    end
    if self._validator then
       self._validator:setup{
-         mediator=self._mediator, id=self:id():create('validator'),
-         model=self._model, target_module=self._target_module
+         mediator=self._mediator, 
+         id=self:id():create('validator'),
+         model=self._model, 
+         target_module=self._target_module
       }
    end
    if self._tester then
       self._tester:setup{
-         mediator=self._mediator, id=self:id():create('tester'),
-         model=self._model, target_module=self._target_module
+         mediator=self._mediator, 
+         id=self:id():create('tester'),
+         model=self._model, 
+         target_module=self._target_module
       }
    end
    if self._observer then
@@ -100,9 +106,11 @@ function Experiment:run(datasource, once)
       self:setup()
    end   
    local report = self:report()
+   -- get trainDataSet, which include inputDataView and outputDataView 
    local train_set = datasource:trainSet()
    local valid_set = datasource:validSet()
    local test_set = datasource:testSet()
+
    local atleastonce = false
    repeat
       self._epoch = self._epoch + 1
@@ -115,10 +123,12 @@ function Experiment:run(datasource, once)
       if self._tester and test_set then
          self._tester:propagateEpoch(test_set, report)
       end
+
       report = self:report()
+      
       self._mediator:publish("doneEpoch", report)
       atleastonce = true
-   until (self:isDoneExperiment() or self._epoch >= self._max_epoch or (once and atleastonce))
+    until (self:isDoneExperiment() or self._epoch >= self._max_epoch or (once and atleastonce))
    self._mediator:publish("finalizeExperiment")
 end
 

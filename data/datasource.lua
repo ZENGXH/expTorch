@@ -4,6 +4,10 @@
 -- Used to generate up to 3 DataSets : train, valid and test.
 -- Can also perform preprocessing using Preprocess on all DataSets by
 -- fitting only the training set.
+-- core of DataSource is [DataSet] trainSet, testSet, validSet | [preprocess] inputPreprocess and targetPreprocess
+-- -- core of BaseSets(DataSet, Batch) is [DataView] inputs, targets
+-- -- -- core of dataView(ImageVIew, ClassView, ListView...) is [which_set] like string 'train' & [data] torch.Tensor which is filled by calling `forward`
+--
 ------------------------------------------------------------------------
 local DataSource = torch.class("dp.DataSource")
 DataSource.isDataSource = true
@@ -23,6 +27,7 @@ function DataSource:__init(config)
       'the validation and test sets',
       {arg='train_set', type='dp.DataSet', --req=true,
        help='used for minimizing a Loss by optimizing a Model'},
+
       {arg='valid_set', type='dp.DataSet',
        help='used for cross-validation and for e.g. early-stopping.'},
       {arg='test_set', type='dp.Dataset',

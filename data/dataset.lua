@@ -39,14 +39,18 @@ end
 
 function DataSet:sub(batch, start, stop)
    if (not batch) or (not stop) then 
+      -- batch not given or stop not given
       if batch then
+         -- only receive two arguments
          stop = start
          start = batch
       end
       return dp.Batch{
-         which_set=self:whichSet(), epoch_size=self:nSample(),
-         inputs=self:inputs():sub(start, stop),
+         which_set=self:whichSet(), 
+         epoch_size=self:nSample(),
+         inputs=self:inputs():sub(start, stop), -- get a DataView Contains sub_data from start to stop of the orignal inputs
          targets=self:targets() and self:targets():sub(start, stop)
+         -- why `and` here?
       }    
    end
    assert(batch.isBatch, "Expecting dp.Batch at arg 1")
@@ -54,6 +58,7 @@ function DataSet:sub(batch, start, stop)
    if self:targets() then
       self:targets():sub(batch:targets(), start, stop)
    end
+
    return batch  
 end
 
@@ -61,7 +66,8 @@ function DataSet:index(batch, indices)
    if (not batch) or (not indices) then 
       indices = indices or batch
       return dp.Batch{
-         which_set=self:whichSet(), epoch_size=self:nSample(),
+         which_set=self:whichSet(), 
+         epoch_size=self:nSample(),
          inputs=self:inputs():index(indices),
          targets=self:targets() and self:targets():index(indices)
       }

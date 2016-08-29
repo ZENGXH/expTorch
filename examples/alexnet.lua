@@ -38,6 +38,7 @@ opt.validPath = (opt.validPath == '') and paths.concat(opt.dataPath, 'ILSVRC2012
 opt.metaPath = (opt.metaPath == '') and paths.concat(opt.dataPath, 'metadata') or opt.metaPath
 table.print(opt)
 
+
 if opt.LCN then
    assert(opt.cuda, "LCN only works with CUDA")
    require "inn"

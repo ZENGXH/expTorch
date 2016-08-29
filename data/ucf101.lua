@@ -1,35 +1,25 @@
-------------------------------------------------------------------------
---[[ ImageNet ]]--
--- http://image-net.org/challenges/LSVRC/2014/download-images-5jj5.php
--- Wraps the Large Scale Visual Recognition Challenge 2014 (ILSVRC2014)
--- classification dataset (commonly known as ImageNet). The dataset
--- hasn't changed from 2012-2014.
--- Due to its size, the data first needs to be prepared offline :
--- 1. use scripts/downloadimagenet.lua to download and extract the data
--- 2. use scripts/harmonizeimagenet.lua to harmonize train/valid sets
-------------------------------------------------------------------------
-local ImageNet, DataSource = torch.class("dp.ImageNet", "dp.DataSource")
--- local log = require 'utils.log'
+local UCF101, DataSource = torch.class("dp.UCF101", "dp.DataSource")
+local log = require 'utils.log'
 
-ImageNet._name = 'ImageNet'
-ImageNet._image_axes = 'bchw'
-ImageNet._classes = torch.range(1,1000):totable()
+UCF101._name = 'UCF101'
+UCF101._image_axes = 'bchw'
+UCF101._classes = torch.range(1,1000):totable()
 
-function ImageNet:__init(config)
+function UCF101:__init(config)
    config = config or {}
    assert(torch.type(config) == 'table' and not config[1], 
       "Constructor requires key-value arguments")
    if config.input_preprocess or config.output_preprocess then
-      error("ImageNet doesnt support Preprocesses. "..
+      error("UCF101 doesnt support Preprocesses. "..
             "Use Sampler ppf arg instead (for online preprocessing)")
    end
    local load_all, input_preprocess, target_preprocess
-   self._args, self._load_size, self._sample_size, 
+   self._args, self._load_size, self._sample_size, input_type, 
       self._train_path, self._valid_path, self._meta_path, 
       self._verbose, load_all, self._cache_mode
       = xlua.unpack(
       {config},
-      'ImageNet',
+      'UCF101',
       'ILSVRC2012-14 image classification dataset',
       {arg='load_size', type='table', 
        help='an approximate size to load the images to before cropping.'
@@ -38,15 +28,18 @@ function ImageNet:__init(config)
       {arg='sample_size', type='table',
        help='a consistent size for cropped patches from loaded images.'
        ..' Defaults to 3x224x244.'},
-
+      
+      {arg='input_type', type='string',
+       help='flow or rgb'},
+       
       {arg='train_path', type='string', help='path to training images',
-       default=paths.concat(dp.DATA_DIR, 'ImageNet', 'ILSVRC2012_img_train')},
+       default=paths.concat(dp.DATA_DIR, 'ucf101_'..input_type, 'ucf101_'..input_type..'_train')},
 
       {arg='valid_path', type='string', help='path to validation images',
-       default=paths.concat(dp.DATA_DIR, 'ImageNet', 'ILSVRC2012_img_val')},
+       default=paths.concat(dp.DATA_DIR, 'ucf101_'..input_type, 'ucf101_'..input_type..'_test')},
 
       {arg='meta_path', type='string', help='path to meta data',
-       default=paths.concat(dp.DATA_DIR, 'ImageNet', 'metadata')},
+       default=paths.concat(dp.DATA_DIR, 'ucf101_'..input_type, 'metadata')},
 
       {arg='verbose', type='boolean', default=true,
        help='Verbose mode during initialization'},
@@ -70,12 +63,12 @@ function ImageNet:__init(config)
       self:loadValid()
       self:loadMeta()
    else
-      -- log.info('not load all, call loadTrain | loadValid | youself')
+      log.info('not load all, call loadTrain | loadValid | youself')
    end
 end
 
-function ImageNet:loadTrain()
-   local dataset = dp.ImageClassSet{
+function UCF101:loadTrain()
+   local dataset = dp.VideoClassSet{
       data_path=self._train_path, 
       load_size=self._load_size,
       which_set='train', 
@@ -91,8 +84,8 @@ function ImageNet:loadTrain()
    return dataset
 end
 
-function ImageNet:loadValid()
-   local dataset = dp.ImageClassSet{
+function UCF101:loadValid()
+   local dataset = dp.VideoClassSet{
       data_path=self._valid_path, 
       load_size=self._load_size,
       which_set='valid', 
@@ -108,13 +101,13 @@ function ImageNet:loadValid()
    return dataset
 end
 
-function ImageNet:loadMeta()
+function UCF101:loadMeta()
    local classInfoPath = paths.concat(self._meta_path, 'classInfo.th7')
    if paths.filep(classInfoPath) then
       self.classInfo = torch.load(classInfoPath)
    else
       if self._verbose then
-         print("ImageNet: skipping "..classInfoPath)
+         print("UCF101: skipping "..classInfoPath)
          print("To avoid this message use harmonizeimagenet.lua "..
                "script and pass correct meta_path")
       end
@@ -123,7 +116,7 @@ end
 
 -- Returns normalize preprocessing function (PPF)
 -- Estimate the per-channel mean/std on training set and caches results
-function ImageNet:normalizePPF()
+function UCF101:normalizePPF()
    local meanstdCache = paths.concat(self._meta_path, 'meanstd.th7')
    local mean, std
    if paths.filep(meanstdCache) then
@@ -142,10 +135,10 @@ function ImageNet:normalizePPF()
                .. nSamples .. ' randomly sampled training images')
       end
       
-      mean = {0,0,0}
-      std = {0,0,0}
+      mean = {0, 0, 0}
+      std = {0, 0, 0}
       local batch
-      for i=1,nSamples,100 do
+      for i=1, nSamples, 100 do
          batch = trainSet:sample(batch, 100)
          local input = batch:inputs():forward('bchw')
          for j=1,3 do
@@ -153,7 +146,7 @@ function ImageNet:normalizePPF()
             std[j] = std[j] + input:select(2,j):std()
          end
       end
-      for j=1,3 do
+      for j=1, 3 do
          mean[j] = mean[j]*100 / nSamples
          std[j] = std[j]*100 / nSamples
       end
@@ -171,7 +164,7 @@ function ImageNet:normalizePPF()
    
    local function ppf(batch)
       local inputView = batch:inputs()
-      assert(inputView:view() == 'bchw', 'ImageNet ppf only works with bchw')
+      assert(inputView:view() == 'bchw', 'UCF101 ppf only works with bchw')
       local input = inputView:input()
       for i=1,3 do -- channels
          input:select(2,i):add(-mean[i]):div(std[i]) 
@@ -191,7 +184,7 @@ function ImageNet:normalizePPF()
    return ppf
 end
 
-function ImageNet:multithread(nThread)
+function UCF101:multithread(nThread)
    if self._train_set then
       self._train_set:multithread(nThread)
    end

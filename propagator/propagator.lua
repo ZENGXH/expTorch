@@ -20,28 +20,36 @@ function Propagator:__init(config)
       'or train the model',
       {arg='loss', type='nn.Criterion',
        help='a neural network Criterion to evaluate or minimize'},
+
       {arg='callback', type='function',
        help='function(model, report) that does things like'..
        'update model, gather statistics, decay learning rate, etc.'},
+      
       {arg='epoch_callback', type='function', 
        help='function(model, report) that is called between epochs'},
+      
       {arg='sampler', type='dp.Sampler', 
        help='Iterates through a DataSet. [Default=dp.Sampler()]'},
+
       {arg='observer', type='dp.Observer', 
        help='observer that is informed when an event occurs.'},
+
       {arg='feedback', type='dp.Feedback',
        help='takes predictions, targets, model and visitor as input '..
        'and provides feedback through report(), setState, or mediator'},
+
       {arg='progress', type='boolean', default=false, 
        help='display progress bar'},
+
       {arg='verbose', type='boolean', default=true,
        help='print verbose information'},
+
       {arg='stats', type='boolean', default=false,
        help='display performance statistics (speed, etc). '..
       'Only applies if verbose is true.'}
    )
    self:sampler(sampler or dp.Sampler())
-   self:loss(loss)
+   self:loss(loss) -- setup Criterion
    self:observer(observer)
    self:feedback(feedback)
    self:callback(callback)
@@ -59,10 +67,13 @@ function Propagator:setup(config)
       'Post-initialization setup of the Propagator',
       {arg='id', type='dp.ObjectID', req=true,
        help='uniquely identifies the propagator.'},
+
       {arg='model', type='nn.Module',
        help='the model that is to be trained or tested',},
+
       {arg='mediator', type='dp.Mediator', req=true,
        help='used for inter-object communication.'},
+
       {arg='target_module', type='nn.Module', 
        help='Optional module through which targets can be forwarded'}
    )
@@ -73,17 +84,19 @@ function Propagator:setup(config)
    self:model(model)
    self._target_module = target_module or nn.Identity()
    self._sampler:setup{mediator=mediator, model=model}
-   if self._observer then self._observer:setup{
-      mediator=mediator, subject=self
-   } end
-   if self._feedback then self._feedback:setup{
-      mediator=mediator, propagator=self, dataset=dataset
-   } end
-   if self._visitor then self._visitor:setup{
-      mediator=mediator, model=self._model, propagator=self
-   } end
+   if self._observer then 
+       self._observer:setup{mediator=mediator, subject=self} 
+   end
+   if self._feedback then 
+       self._feedback:setup{mediator=mediator, propagator=self, dataset=dataset} 
+   end
+   if self._visitor then 
+       self._visitor:setup{mediator=mediator, model=self._model, propagator=self} 
+   end
 end
 
+-- create sampler for current dataset, call propagateBatch recurrently
+--
 function Propagator:propagateEpoch(dataset, report)
    self.sumErr = 0
    if self._feedback then
@@ -107,15 +120,18 @@ function Propagator:propagateEpoch(dataset, report)
    self._epoch_callback(self._model, report)
    
    self._n_sample = 0
+
+   -- create an sampler object in class Sampler
    local sampler = self._sampler:sampleEpoch(dataset)
+   
    while true do
       -- reuse the batch object
+      -- if not exist then sampler(batch) will create one
       if batch then
          assert(torch.type(batch) == 'dp.Batch')
       end
-      
       batch, i, n = sampler(batch)
-      if not batch then 
+      if not batch then -- fail?
          -- for aesthetics :
          if self._progress then
             xlua.progress(last_n, last_n)
@@ -123,7 +139,7 @@ function Propagator:propagateEpoch(dataset, report)
          break 
       end
       
-      self.nSample = i
+      self.nSample = i -- == min(nSampled, epochSize)
       self:propagateBatch(batch, report)
       
       if self._progress then

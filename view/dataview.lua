@@ -443,10 +443,13 @@ end
 
 -- Returns a sub-view narrowed on the batch dimension
 -- inplace returns a narrow window into self._input instead of a copy
+-- return a dataView which contain torch.Tensor data which is narrow from the original DataView
 function DataView:sub(v, start, stop, inplace)
    local b_pos = self:findAxis('b')
    local data
    if v and stop then
+      -- given v and stop, check type v is the same with v; 
+      -- check v._view == self._view
       if torch.type(v) ~= torch.type(self) then
          error("Expecting "..torch.type(self).." at arg 1 "..
                "got "..torch.type(v).." instead")
@@ -455,17 +458,20 @@ function DataView:sub(v, start, stop, inplace)
          error("Expecting arg 1 to have same view")
       end
       data = v:input() or self:input().new()
-   else
-      if v then
+   else -- no v, i.e receive 3 or 2 arguments only
+      if v then -- the first arguments is indeed `start`
+         -- stop not given, only receive two arguments
          inplace = stop
          stop = start
          start = v
       end
+      -- create an object of DataView
       v = torch.protoClone(self)
       data = self:input().new()
    end
    
-   local input = self._input:narrow(b_pos, start, stop-start+1)
+   local input = self._input:narrow(b_pos, start, stop-start + 1)
+   
    if inplace then
       -- user beware: this doesn't interact well with :index()
       data:set(input) 
@@ -473,6 +479,7 @@ function DataView:sub(v, start, stop, inplace)
       data:resizeAs(input)
       data:copy(input)
    end
+   -- filling the sub slice of data into v and return
    v:forward(self._view, data)
    return v
 end
@@ -518,7 +525,7 @@ end
 function DataView:transpose(new_view)
    local view = _.split(self._view)
    local transpositions = {}
-   for i=1,#new_view do
+   for i=1, #new_view do
       local j = _.indexOf(view, new_view:sub(i,i))
       if i ~= j then
          local char = view[i]

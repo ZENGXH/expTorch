@@ -81,6 +81,9 @@ function Sampler:report()
 end
 
 --static function. Checks dataset type or gets dataset from datasource
+-- @param dataset, can be DataSource which contains a trainSet 
+--                  or dataView 
+-- convert all to dataSet format, the return
 function Sampler.toDataset(dataset)
    if dataset.isDataSource then
       -- assumes dataset is the DataSource's training set
@@ -103,34 +106,50 @@ function Sampler:collectgarbage()
    end
 end
 
--- Returns an iterator over samples for one epoch
+-- Returns an `iterator` over samples for one epoch
 -- Default is to iterate sequentially over all examples
+-- @param dataset dataSet which include inputDataView and outputDataView
+-- return an function object: an instance of sampler in Sampler class
+-- which has member function call by (batch)
 function Sampler:sampleEpoch(dataset)
    dataset = dp.Sampler.toDataset(dataset)
    local nSample = dataset:nSample()
    local epochSize = self._epoch_size or nSample
-   self._start = self._start or 1
+   self._start = self._start or 1 -- if self._start not set, default from 1
    local nSampled = 0
    local stop
    -- build iterator
+   -- function which can call as: sampler(batch)
+   -- return batch, min(nSampled, epochSize), epochSize
    return function(batch)
       if nSampled >= epochSize then
          return
       end
-      stop = math.min(self._start+self._batch_size-1,nSample)
-      batch = batch or dataset:batch(stop-self._start+1)
+      stop = math.min(self._start + self._batch_size - 1, nSample)
+      -- build up a batch given with batch_size, with [dataView]inputs and targets
+      -- if batch is nil, will call batch_building with batch_size: step - self._start + 1, 
+      -- in the function will call 
+      -- Dataset:sub(1, 1 + stop - self._start), 
+      -- i.e. the filling self.inputs[1, length] first
+      batch = batch or dataset:batch(stop - self._start + 1)
       -- inputs and targets
+      -- batch in init already, calling sub will dill the data into batch._inputs and batch._targets
       dataset:sub(batch, self._start, stop)
+
       local indices = batch:indices() or torch.Tensor()
+      
       -- metadata
       batch:setup{
-         batch_iter=stop, batch_size=self._batch_size,
+         batch_iter=stop, 
+         batch_size=self._batch_size,
          n_sample=stop-self._start+1, 
-         indices=indices:range(self._start,stop)
+         indices=indices:range(self._start, stop)
       }
+      -- data preprocesses, if no return batch 
       batch = self._ppf(batch)
       nSampled = nSampled + stop - self._start + 1
       self._start = self._start + self._batch_size
+
       if self._start >= nSample then
          self._start = 1
       end
@@ -140,6 +159,7 @@ function Sampler:sampleEpoch(dataset)
 end
 
 -- used with datasets that support asynchronous iterators like ImageClassSet
+-- return a function object, call by(batch, putOnly)
 function Sampler:sampleEpochAsync(dataset)
    dataset = dp.Sampler.toDataset(dataset)
    local nSample = dataset:nSample()
@@ -154,17 +174,23 @@ function Sampler:sampleEpochAsync(dataset)
       if nSampledGet >= epochSize then
          return
       end
-      
+      -- recurrently put #epochSize sample
       if nSampledPut < epochSize then
-         stop = math.min(self._start+self._batch_size-1,nSample)
+         stop = math.min(self._start+self._batch_size - 1, nSample)
+         
          -- up values
          local uvstop = stop
          local uvbatchsize = self._batch_size
          local uvstart = self._start
+
+         -- ImageClassSet:subAsyncPut(batch, start, stop, callback)   
          dataset:subAsyncPut(batch, self._start, stop,
             function(batch) 
                -- metadata
-               batch:setup{batch_iter=uvstop, batch_size=batch:nSample()}
+               batch:setup{
+                   batch_iter=uvstop, 
+                   batch_size=batch:nSample()
+               }
                batch = self._ppf(batch)
             end)
          
@@ -192,6 +218,7 @@ function Sampler:sampleEpochAsync(dataset)
    return sampleBatch
 end
 
+-- change normal sampleEpoch to sampleEpochAsync
 function Sampler:async()
    self.sampleEpoch = self.sampleEpochAsync
 end

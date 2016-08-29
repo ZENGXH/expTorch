@@ -111,7 +111,11 @@ function Cifar10:createDataSet(data, which_set)
    target_v:forward('b', targets)
    target_v:setClasses(self._classes)
    -- construct dataset
-   local ds = dp.DataSet{inputs=input_v,targets=target_v,which_set=which_set}
+   local ds = dp.DataSet{
+       inputs=input_v,
+       targets=target_v,
+       which_set=which_set
+   }
    ds:ioShapes('bchw', 'b')
    return ds
 end
