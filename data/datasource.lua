@@ -14,7 +14,7 @@ DataSource.isDataSource = true
 
 function DataSource:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, train_set, valid_set, test_set, 
+   local args, name, train_set, valid_set, test_set, 
          input_preprocess, target_preprocess
       = xlua.unpack(
       {config},
@@ -25,6 +25,9 @@ function DataSource:__init(config)
       'DataSets by fitting the preprocess (e.g. Standardization) on ' ..
       'only the training set, and reusing the same statistics on ' ..
       'the validation and test sets',
+      {arg='name', type='string', default='ds', 
+      helper='name of the datasource, default: ds'},
+
       {arg='train_set', type='dp.DataSet', --req=true,
        help='used for minimizing a Loss by optimizing a Model'},
 
@@ -42,6 +45,9 @@ function DataSource:__init(config)
        '(fitting) on the train_set only, and reusing these to ' ..
        'preprocess the valid_set and test_set.'}  
    )
+
+   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log.SetLoggerName(name)
    --datasets
    self:trainSet(train_set)
    self:validSet(valid_set)
@@ -56,6 +62,7 @@ end
 -- return View and DataSet
 -- 
 function DataSource:getView(which_set, attribute)
+   self.log.trace('getView ', which_set, ' attribute: ', attribute)
    which_set = which_set or 'train'
    attribute = attribute or 'input'
    
@@ -78,7 +85,7 @@ function DataSource:getView(which_set, attribute)
    else
       error("expecting 'input' or 'target' at arg 2: "..attribute)
    end
-   
+   assert(dataview) 
    return dataview, dataset
 end
 
@@ -129,22 +136,29 @@ end
 
 function DataSource:trainSet(train_set)
    if train_set then
+      self.log.trace('[ds] set train_set')
       self._train_set = train_set
    end
+
+   self.log.trace('[ds] request train_set')
    return self._train_set
 end
 
 function DataSource:validSet(valid_set)
    if valid_set then
+      self.log.trace('[ds] set valid_set')
       self._valid_set = valid_set
    end
+   self.log.trace('[ds] request valid_set')
    return self._valid_set
 end
 
 function DataSource:testSet(test_set)
    if test_set then
+      self.log.trace('[ds] set test_set')
       self._test_set = test_set
    end
+   self.log.trace('[ds] request test_set')
    return self._test_set
 end
 

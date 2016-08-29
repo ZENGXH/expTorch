@@ -6,6 +6,11 @@
 ------------------------------------------------------------------------
 local ClassView, parent = torch.class("dp.ClassView", "dp.DataView")
 ClassView.isClassView = true
+function ClassView:__init(name)
+    local name = name or 'ClassView'
+    parent.__init(self, name)
+end
+
 
 function ClassView:setClasses(classes)
    self._classes = classes

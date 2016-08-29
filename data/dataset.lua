@@ -19,6 +19,10 @@
 local DataSet, parent = torch.class("dp.DataSet", "dp.BaseSet")
 DataSet.isDataSet = true
 
+function DataSet:__init(config)
+    parent.__init(self, config)
+end
+
 function DataSet:ioShapes(input_shape, output_shape)
    if input_shape or output_shape then
       self._input_shape = input_shape or self._input_shape

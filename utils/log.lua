@@ -13,6 +13,12 @@ local log = { _version = "0.1.0" }
 log.usecolor = true
 log.outfile = log.outfile or paths.concat(os.getenv('PWD'), 'log')
 log.level = "trace"
+log.name = " " 
+
+function log.SetLoggerName(name)
+    print('set log name as ', name)
+    log.name = name
+end
 
 local modes = {
   { name = "trace", color = "\27[34m", },
@@ -69,7 +75,7 @@ for i, x in ipairs(modes) do
     local msg = tostring(...)
     local info = debug.getinfo(2, "Sl")
     local lineinfo = info.short_src .. ":" .. info.currentline
-    local info_up = debug.getinfo(3, "sl")
+    local info_up = debug.getinfo(3, "Sl")
     local lineinfo_up = "("..info_up.short_src .. ":" .. info_up.currentline..")"
 
     -- Output to console
@@ -85,14 +91,16 @@ for i, x in ipairs(modes) do
         return 
     end   
     if x.name == "tracefrom" then
-        msg = msg..'-fr-'..lineinfo_up
+        msg = msg..'---'..lineinfo_up
     end
-    print(string.format("%s[%-6s%s]%s %s: %s",
+
+    print(string.format("%s[%-6s%s]%s %s:{%s} %s",
                         log.usecolor and x.color or "",
                         nameupper,
                         os.date("%H:%M:%S"),
                         log.usecolor and "\27[0m" or "",
                         lineinfo,
+                        log.name,
                         msg))
     
 

@@ -5,10 +5,11 @@
 -- provide b() and bf() view, others can be found in the sub-class
 ------------------------------------------------------------------------
 local DataView, parent = torch.class("dp.DataView", "dp.View")
+local helper = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'helper.lua'))()
 DataView.isDataView = true
 
 function DataView:__init(view, input)
-   parent.__init(self)
+   parent.__init(self, 'dataview')
    if view and input then
       self:forward(view, input)
    end
@@ -26,23 +27,15 @@ end
 -- @para input
 -- fill self._tensors table(inherit from dp.View)
 -- self._tensors = 
---  {
---      ['bchw'] = 
---          { 
---              ['torch.DoubleTensor'] = input
---          }
---  }
+--      key: view(string) & value: viewTable,
+--          viewTable: key: type(string) & value: torch.Tensor
+--  {['bchw'] = {['torch.DoubleTensor'] = input}}
 -- self._modules = 
---  {
---      ['bchw'] = 
---          {
---              nn.Identity(),
---              {
---                  ['torch.DoubleTensor'] = nn.Identity()
---              }
---          }
---  }
+--      key: view(string) & value: moduleTable
+--          moduleTable = {modula, typeConversionTable}
+--  {['bchw'] = { nn.Identity(),{['torch.DoubleTensor'] = nn.Identity()}}}
 function DataView:forwardPut(view, input)
+   self.log.trace('[DataView] forwardPut view: ', view, ' with tensor size: ', helper.PrintSize(input))
    -- store input for later use
    self._dim = #view -- eg #'bhwc' = 4
    if input:dim() ~= self._dim then
@@ -67,6 +60,7 @@ function DataView:forwardPut(view, input)
 end
    
 -- This method could be called from multiple output Models
+-- return the tensor from the self._tensor by key'view' and key'tensor_type'
 function DataView:forwardGet(view, tensor_type)
    self._got = true
    tensor_type = tensor_type or self._type
@@ -86,6 +80,7 @@ function DataView:forwardGet(view, tensor_type)
 end
 
 -- returns a tensor of shape view and type tensor_type
+-- return the module from the view and the 
 function DataView:tensorFromModule(view, tensor_type)
    local viewTable = self._tensors[view] or {}
    local input_type = torch.typename(self._input)
@@ -97,9 +92,7 @@ function DataView:tensorFromModule(view, tensor_type)
       -- make sure it accepts the right input type
       modula:type(self._type)
       local copy = nn.Copy(input_type, tensor_type)
-
       self._modules[view] = {modula, {[tensor_type] = copy}}
-      
       local tensor = modula:forward(self._input)
       viewTable[input_type] = tensor
       tensor = copy:forward(tensor)
@@ -219,7 +212,7 @@ function DataView:bf()
    if dim > 2 then
       local transpose = modula
       local reshape = nn.Reshape(self:sampleSize(b_pos))
-      if transpose then
+      if transpose then -- b_pos ~= 1, need transpose
          modula = nn.Sequential()
          modula:add(transpose) -- make batchSize in first dimen
          modula:add(reshape) -- reshape all feature in one line
