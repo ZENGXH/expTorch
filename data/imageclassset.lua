@@ -1,11 +1,11 @@
 ------------------------------------------------------------------------
---[[ ImageClassSet ]]--
--- A DataSet for image classification in a flat folder structure :
--- [data_path]/[class]/[imagename].JPEG  (folder-name is class-name)
--- Optimized for extremely large datasets (14 million images+).
--- Tested only on Linux (as it uses command-line linux utilities to 
+--[[ imageclassset ]]--
+-- a dataset for image classification in a flat folder structure :
+-- [data_path]/[class]/[imagename].jpeg  (folder-name is class-name)
+-- optimized for extremely large datasets (14 million images+).
+-- tested only on linux (as it uses command-line linux utilities to 
 -- scale up to 14 million+ images)
--- Images on disk can have different height, width and number of channels.
+-- images on disk can have different height, width and number of channels.
 ------------------------------------------------------------------------
 local ImageClassSet, parent = torch.class("dp.ImageClassSet", "dp.DataSet")
 

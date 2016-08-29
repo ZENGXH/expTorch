@@ -1,4 +1,4 @@
-local helper = torch.clas('dp.helper')
+local helper = {}
 local log = loadfile('util/log.lua')()
 
 function helper.WeightInitUniform(net, v)
@@ -120,3 +120,5 @@ function helper.TrackMemory(free, msg)
     log.info(string.format('>> %s TrackMemory >> freeMemory from %.3f to %.3f %s', helper.GetBugLocation, old_free/(1024 * 1024), freeMemory/(1024*1024), msg))
     return freeMemory
 end
+
+return helper
