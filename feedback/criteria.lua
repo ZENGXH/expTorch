@@ -70,8 +70,14 @@ end
 
 function Criteria:_add(batch, output, carry, report)             
    local current_error
-   for k,v in self._criteria do
-      current_error = v:forward(output.act:data(), batch:targets():data())
+   local new_output
+   if torch.isTypeOf(output, 'table') and self.selected_output then
+        new_output = output[1]
+   else
+       new_output = output
+   end
+   for k, v in self._criteria do
+      current_error = v:forward(new_output.act:data(), batch:targets():data())
       self._errors[k] =  (
                               ( self._n_sample * self._errors[k] ) 
                               + 

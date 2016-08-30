@@ -12,23 +12,24 @@ function Confusion:__init(config)
    config = config or {}
    assert(torch.type(config) == 'table' and not config[1], 
       "Constructor requires key-value arguments")
-   local args, bce, name, target_dim, output_module = xlua.unpack(
-      {config},
+   local args = {}
+   --bce, name, target_dim, output_module = xlua.unpack(
+   dp.helper.unpack_config(args, {config},
       'Confusion', 
       'Adapter for optim.ConfusionMatrix',
       {arg='bce', type='boolean', default=false,
        help='set true when using Binary Cross-Entropy (BCE)Criterion'},
-      {arg='name', type='string', default='confusion',
+      {arg='name', type='string', default='conf_fb',
        help='name identifying Feedback in reports'},
       {arg='target_dim', default=-1, type='number',
       help='row index of target label to be used to measure confusion'},
       {arg='output_module', type='nn.Module',
        help='module applied to output before measuring confusion matrix'}
    )
-   config.name = name
-   self._bce = bce
-   self._output_module = output_module or nn.Identity()
-   self._target_dim = target_dim
+   config.name = args.name
+   self._bce = args.bce
+   self._output_module = args.output_module or nn.Identity()
+   self._target_dim = args.target_dim
    parent.__init(self, config)
 end
 
@@ -47,7 +48,7 @@ function Confusion:_add(batch, output, report)
    if self._output_module then
       output = self._output_module:updateOutput(output)
    end
-   
+   -- init ConfusionMatrix   
    if not self._cm then
       if self._bce then
          self._cm = optim.ConfusionMatrix({0,1})
@@ -79,7 +80,7 @@ function Confusion:_add(batch, output, report)
       self._actf:resize(act:size()):copy(act)
       act = self._actf
    end
-   
+   -- add result to confusion matrix
    self._cm:batchAdd(act, tgt)
 end
 
