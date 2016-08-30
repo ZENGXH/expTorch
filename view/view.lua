@@ -4,7 +4,6 @@
 -- Adapter (design pattern) for torch.Tensor 
 ------------------------------------------------------------------------
 local View = torch.class("dp.View")
-local helper = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'helper.lua'))()
 View.isView = true
 
 function View:__init(name)
@@ -32,7 +31,7 @@ function View:forward(view, inputORtype)
       self.log.trace('{view} forward GET view: ', view, inputORtype)
       return self:forwardGet(view, inputORtype)
   end
-   self.log.trace('{view} forward PUT view: ', view, ' with tensor: ', helper.PrintSize(inputORtype))
+   self.log.trace('{view} forward PUT view: ', view, ' with tensor: ', dp.helper.PrintSize(inputORtype))
    return self:forwardPut(view, inputORtype)
 end
 

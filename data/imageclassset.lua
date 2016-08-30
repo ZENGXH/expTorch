@@ -14,74 +14,68 @@ ImageClassSet._output_shape = 'b'
 
 function ImageClassSet:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, data_path, load_size, sample_size, sample_func, which_set,  
-      verbose, sort_func, cache_mode, cache_path = xlua.unpack(
+   local args = {}
+   -- data_path, load_size, sample_size, sample_func, which_set,  
+   --   verbose, sort_func, cache_mode, cache_path = 
+   dp.helper.unpack_config(args,
       {config},
       'ImageClassSet', 
       'A DataSet for images in a flat folder structure',
       {arg='data_path', type='table | string', req=true,
        help='one or many paths of directories with images'},
-
       {arg='load_size', type='table', req=true,
        help='a size to load the images to, initially'},
-
       {arg='sample_size', type='table',
        help='a consistent sample size to resize the images. '..
        'Defaults to load_size'},
-
       {arg='sample_func', type='string | function', default='sampleDefault',
        help='function f(self, dst, path) used to create a sample(s) from '..
        'an image path. Stores them in dst. Strings "sampleDefault", '..
        '"sampleTrain" or "sampleTest" can also be provided as they '..
        'refer to existing functions'},
-
       {arg='which_set', type='string', default='train',
        help='"train", "valid" or "test" set'},
-
       {arg='verbose', type='boolean', default=true,
        help='display verbose messages'},
-
       {arg='sort_func', type='function', 
-       help='comparison operator used for sorting class dir to get idx.'
-       ..' Defaults to < operator'},
-
+       help='comparison operator used for sorting class dir to get idx.'..
+       ' Defaults to < operator'},
       {arg='cache_mode', type='string', default='writeonce',
        help='writeonce : read from cache if exists, else write to cache. '..
        'overwrite : write to cache, regardless if exists. '..
        'nocache : dont read or write from cache. '..
        'readonly : only read from cache, fail otherwise.'},
-
       {arg='cache_path', type='string', 
        help='Path to cache. Defaults to [data_path[1]]/cache.th7'}
    )
    -- globals
-   gm = require 'graphicsmagick'
+   -- gm = require 'graphicsmagick'
    
    -- locals
-   self:whichSet(which_set)
-   self._load_size = load_size
+   self:whichSet(args.which_set)
+   self._load_size = args.load_size
    assert(self._load_size[1] == 3, "ImageClassSet doesn't yet support greyscaling : load_size")
-   self._sample_size = sample_size or self._load_size
+   self._sample_size = args.sample_size or self._load_size
    assert(self._sample_size[1] == 3, "ImageClassSet doesn't yet support greyscaling : sample_size")
-   self._verbose = verbose   
-   self._data_path = type(data_path) == 'string' and {data_path} or data_path
-   self._sample_func = sample_func
+   self._verbose = args.verbose   
+   self._data_path = type(args.data_path) == 'string' and {args.data_path} or args.data_path
+   self._sample_func = args.sample_func
    -- TODO: assert input argument sample_func is valid
-   self._sort_func = sort_func
-   self._cache_mode = cache_mode
-   self._cache_path = cache_path or paths.concat(self._data_path[1], 'cache.th7')
+   self._sort_func = args.sort_func
+   self._cache_mode = args.cache_mode
+   self._cache_path = args.cache_path or paths.concat(self._data_path[1], 'cache.th7')
    
    -- indexing and caching
    assert(_.find({'writeonce','overwrite','nocache','readonly'},cache_mode), 'invalid cache_mode :'..cache_mode)
    local cacheExists = paths.filep(self._cache_path)
-   if cache_mode == 'readonly' or (cache_mode == 'writeonce' and cacheExists) then
-      if not cacheExists then
+   if args.cache_mode == 'readonly' or (args.cache_mode == 'writeonce' and args.cacheExists) then
+      if not args.cacheExists then
          error"'readonly' cache_mode requires an existing cache, none found"
       end
       self:loadIndex()
    else
       self:buildIndex()
-      if cache_mode ~= 'nocache' then
+      if args.cache_mode ~= 'nocache' then
          self:saveIndex()
       end
    end
@@ -108,6 +102,20 @@ function ImageClassSet:loadIndex()
    end
    self._n_sample = self.imagePath:size(1)
 end
+
+------
+-- classIndices: table
+--      key: class name, value: index_class
+-- classes: table
+--      key: idx, value: classes names
+-- classPaths: table of table
+--      key: index_class, value: table of image path of the class
+-- imagePath: torch.CharTensor, size(1) == _n_sample
+-- imageClass: torch.LongTensor
+-- classList: table of torch.LongTensor
+-- classListSample: table
+--      key: index_class, value: torch.LongTensor contain index_image of cur class
+--
 
 function ImageClassSet:buildIndex()
    -- loop over each paths folder, get list of unique class names, 

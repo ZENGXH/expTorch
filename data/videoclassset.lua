@@ -8,7 +8,6 @@
 -- currently not modify for frames-level-raw-video-frames input
 ------------------------------------------------------------------------
 
-local helper = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'helper.lua'))()
 local VideoClassSet, parent = torch.class("dp.VideoClassSet", "dp.DataSet")
 -- batch, timeStep, channels, height, width
 VideoClassSet._input_shape = 'btchw' 
@@ -18,11 +17,8 @@ function VideoClassSet:__init(config)
     parent.__init(self, config)
     self.log.info('__init VideoClassSet', unpack(config))
     assert(type(config) == 'table', "Constructor requires key-value arguments")
-    local args, classID_file,
-        video_list, data_path, load_size, sample_size, 
-        sample_func, which_set, frames_per_select, 
-        verbose, sort_func, cache_mode, cache_path,
-        io_helper = xlua.unpack(
+    local args = {} 
+    dp.helper.unpack_config(args,
     {config},
     'VideoClassSet', 
     'A DataSet for images in a flat folder structure',
@@ -72,14 +68,14 @@ function VideoClassSet:__init(config)
 
     -- locals
     
-    self:whichSet(which_set)
-    self._load_size = load_size
-    self._sample_size = sample_size or self._load_size
-    self._verbose = verbose   
-    self._classID_file = classID_file
-    self._video_list = type(video_list) == 'string' and video_list
-    self._data_path = type(data_path) == 'string' and {data_path} or data_path
-    self.frames_per_select = frames_per_select
+    self:whichSet(args.which_set)
+    self._load_size = args.load_size
+    self._sample_size = args.sample_size or self._load_size
+    self._verbose = args.verbose   
+    self._classID_file = args.classID_file
+    self._video_list = type(args.video_list) == 'string' and args.video_list
+    self._data_path = type(args.data_path) == 'string' and {args.data_path} or args.data_path
+    self.frames_per_select = args.frames_per_select
     self.log.info('[videoclassset] _load_size:', self._load_size)
     self.log.info('\t _sample_size;', unpack(self._sample_size))
     self.log.info('\t _verbose:', self._verbose)
@@ -87,19 +83,19 @@ function VideoClassSet:__init(config)
     self.log.info('\t _data_list:', self._video_list)
     self.log.info('\t _data_path:', self._data_path[1])
     self.log.info('\t get sample_func:', self.sample_func)
-    helper.CheckFileExist(self._video_list)
-    helper.CheckFileExist(self._data_path[1])
-    self._sample_func = sample_func
+    dp.helper.CheckFileExist(self._video_list)
+    dp.helper.CheckFileExist(self._data_path[1])
+    self._sample_func = args.sample_func
     -- TODO: assert input argument sample_func is valid
-    self._sort_func = sort_func
-    self._cache_mode = cache_mode
-    self._cache_path = cache_path or paths.concat(self._data_path[1], 'cache.th7')
-    self.io_helper = io_helper 
+    self._sort_func = args.sort_func
+    self._cache_mode = args.cache_mode
+    self._cache_path = args.cache_path or paths.concat(self._data_path[1], 'cache.th7')
+    self.io_helper = args.io_helper 
     -- indexing and caching
-    assert(_.find({'writeonce','overwrite','nocache','readonly'}, cache_mode), 'invalid cache_mode :'..cache_mode)
+    assert(_.find({'writeonce','overwrite','nocache','readonly'}, args.cache_mode), 'invalid cache_mode :'..args.cache_mode)
     local cacheExists = paths.filep(self._cache_path)
-    self.log.info('[VideoClassSet] cache_mode: ', cache_mode)
-    if cache_mode == 'readonly' or (cache_mode == 'writeonce' and cacheExists) then
+    self.log.info('[VideoClassSet] cache_mode: ', args.cache_mode)
+    if cache_mode == 'readonly' or (args.cache_mode == 'writeonce' and args.cacheExists) then
         if not cacheExists then
             error"'readonly' cache_mode requires an existing cache, none found"
         end
@@ -116,7 +112,7 @@ function VideoClassSet:__init(config)
     self._imgBuffers = {}
 
     -- required for multi-threading
-    self._config = config 
+    self._config = args.config 
 end
 
 function VideoClassSet:saveIndex()
@@ -468,7 +464,7 @@ function VideoClassSet:sample(batch, nSample, sampleFunc)
     -- assert(inputTensor:size(2) == 3)
     assert(inputTensor:size(1) == #inputTable)
     assert(targetTensor:size(1) == #targetTable)
-    self.log.trace('tableToTensor return: size ', helper.PrintSize(inputTensor))
+    self.log.trace('tableToTensor return: size ', dp.helper.PrintSize(inputTensor))
     assert(inputView.isView)
     self.log.trace('calling dataview forward')
     inputView:forward('btchw', inputTensor)

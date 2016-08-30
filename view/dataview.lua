@@ -5,7 +5,6 @@
 -- provide b() and bf() view, others can be found in the sub-class
 ------------------------------------------------------------------------
 local DataView, parent = torch.class("dp.DataView", "dp.View")
-local helper = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'helper.lua'))()
 DataView.isDataView = true
 
 function DataView:__init(view, input)
@@ -35,7 +34,7 @@ end
 --          moduleTable = {modula, typeConversionTable}
 --  {['bchw'] = { nn.Identity(),{['torch.DoubleTensor'] = nn.Identity()}}}
 function DataView:forwardPut(view, input)
-   self.log.trace('[DataView] forwardPut view: ', view, ' with tensor size: ', helper.PrintSize(input))
+   self.log.trace('[DataView] forwardPut view: ', view, ' with tensor size: ', dp.helper.PrintSize(input))
    -- store input for later use
    self._dim = #view -- eg #'bhwc' = 4
    if input:dim() ~= self._dim then

@@ -24,6 +24,8 @@ function Observer:__init(channels, callbacks)
    end
    self._channels = channels or {}
    self._callbacks = callbacks or channels
+   self.log = dofile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log.SetLoggerName('obs')
 end
 
 function Observer:subscribe(channel, callback)

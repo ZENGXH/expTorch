@@ -1,5 +1,22 @@
-local helper = {}
-local log = loadfile('utils/log.lua')()
+local log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+local helper = torch.class("dp.helper")
+
+function helper:__init()
+end
+
+function helper.unpack(obj, args, funcname, description, ...)
+    helper.unpack_config(obj, args, funcname, description, ...)
+end
+
+function helper.unpack_config(obj, args, funcname, description, ...)
+    xlua.unpack_class(object, args, funcname, description, ...)
+    local args = xlua.unpack(args, funcname, description, ...)
+      for k,v in pairs(dargs) do
+            if type(k) ~= 'number' then
+                object[k] = v
+            end
+      end
+end
 
 function helper.WeightInitUniform(net, v)
     local v = v or 0.01

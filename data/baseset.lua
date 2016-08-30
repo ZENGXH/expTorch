@@ -7,14 +7,14 @@ BaseSet.isBaseSet = true
 
 function BaseSet:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, name, which_set, inputs, targets
-      = xlua.unpack(
+   local args = {}
+   -- name, which_set, inputs, targets
+   dp.helper.unpack_config(args
       {config},
       'BaseSet', 
       'Base class inherited by DataSet and Batch.',
       {arg='name', type='string', default=' ', help='name of the set'},
-      {arg='which_set', type='string',
-       help='"train", "valid" or "test" set'},
+      {arg='which_set', type='string', help='"train", "valid" or "test" set'},
       {arg='inputs', type='dp.View | table of dp.Views', 
        help='Sample inputs to a model. These can be Views or '..
        'a table of Views (in which case these are converted '..
@@ -25,12 +25,11 @@ function BaseSet:__init(config)
        'to a ListView. The indices of examples must be '..
        'in both inputs and targets must be aligned.'}
    )
-
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.SetLoggerName(name)
-   self:whichSet(which_set)
-   if inputs then self:inputs(inputs) end
-   if targets then self:targets(targets) end
+   self.log.SetLoggerName(args.name)
+   self:whichSet(args.which_set)
+   if args.inputs then self:inputs(args.inputs) end
+   if args.targets then self:targets(args.targets) end
 end
 
 function BaseSet:whichSet(which_set)

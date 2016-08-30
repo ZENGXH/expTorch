@@ -44,7 +44,6 @@ if opt.LCN then
    require "inn"
 end
 
-
 --[[data]]--
 ds = dp.ImageNet{
    train_path=opt.trainPath, valid_path=opt.validPath, 

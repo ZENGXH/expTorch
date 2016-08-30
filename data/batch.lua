@@ -12,14 +12,15 @@ function Batch:__init(config)
    if not config.name then config.name='batch' end
    parent.__init(self, config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, epoch_size = xlua.unpack(
+   local args 
+   dp.helper.unpack(
       {config},
       'Batch', 
       'State of a mini-batch to be fed into a model and criterion.',
       {arg='epoch_size', type='number',
        help='number of samples in original dataset'}
    )
-   self._epoch_size = epoch_size
+   self._epoch_size = args.epoch_size
    parent.__init(self, config)
 end
 

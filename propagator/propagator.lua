@@ -11,52 +11,44 @@ Propagator.isPropagator = true
 
 function Propagator:__init(config)   
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, loss, callback, epoch_callback, sampler, observer, 
-      feedback, progress, verbose, stats = xlua.unpack(
-      {config},
-      'Propagator', 
+   local args 
+   -- loss, callback, epoch_callback, sampler, observer, 
+   --   feedback, progress, verbose, stats = xlua.unpack(
+   dp.helper.unpack_config(args, {config}, 'Propagator', 
       'Propagates Batches sampled from a DataSet using a Sampler '..
       'through a Model in order to evaluate a Loss, provide Feedback '.. 
       'or train the model',
       {arg='loss', type='nn.Criterion',
        help='a neural network Criterion to evaluate or minimize'},
-
       {arg='callback', type='function',
        help='function(model, report) that does things like'..
        'update model, gather statistics, decay learning rate, etc.'},
-      
       {arg='epoch_callback', type='function', 
        help='function(model, report) that is called between epochs'},
-      
       {arg='sampler', type='dp.Sampler', 
        help='Iterates through a DataSet. [Default=dp.Sampler()]'},
-
       {arg='observer', type='dp.Observer', 
        help='observer that is informed when an event occurs.'},
-
       {arg='feedback', type='dp.Feedback',
        help='takes predictions, targets, model and visitor as input '..
        'and provides feedback through report(), setState, or mediator'},
-
       {arg='progress', type='boolean', default=false, 
        help='display progress bar'},
-
       {arg='verbose', type='boolean', default=true,
        help='print verbose information'},
-
       {arg='stats', type='boolean', default=false,
        help='display performance statistics (speed, etc). '..
       'Only applies if verbose is true.'}
    )
-   self:sampler(sampler or dp.Sampler())
-   self:loss(loss) -- setup Criterion
-   self:observer(observer)
-   self:feedback(feedback)
-   self:callback(callback)
-   self:epochCallback(epoch_callback or function() return end)
-   self._progress = progress
-   self._verbose = verbose
-   self._stats = stats
+   self:sampler(args.sampler or dp.Sampler())
+   self:loss(args.loss) -- setup Criterion
+   self:observer(args.observer)
+   self:feedback(args.feedback)
+   self:callback(args.callback)
+   self:epochCallback(args.epoch_callback or function() return end)
+   self._progress = args.progress
+   self._verbose = args.verbose
+   self._stats = args.stats
 end
 
 function Propagator:setup(config)

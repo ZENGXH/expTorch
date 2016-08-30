@@ -68,7 +68,8 @@ function FacialKeypoints:__init(config)
       train_set=self:trainSet(), 
       valid_set=self:validSet(),
       test_set=self:testSet(),
-      input_preprocess=input_pp, target_preprocess=target_pp
+      input_preprocess=input_pp, 
+      target_preprocess=target_pp
    })
 end
 

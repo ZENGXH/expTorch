@@ -1,14 +1,15 @@
--- require 'nnx'
--- require 'dpnn'
+
+require 'nnx'
+require 'dpnn'
 require 'string'
 _ = require 'moses'
 require 'xlua'
 require 'os'
 require 'sys'
 require 'nn'
--- require 'image'
--- require 'lfs'
--- require 'torchx'
+require 'image'
+require 'lfs'
+require 'torchx'
 ffi = require 'ffi'
 
 ------------------------------------------------------------------------
@@ -19,17 +20,15 @@ ffi = require 'ffi'
 dp = {}
 dp.TORCH_DIR = os.getenv('TORCH_DATA_PATH') or os.getenv('HOME')
 dp.EXP_DIR = os.getenv('PWD')   
+dp.DPRNN_DIR='/data1/zengxiaohui/dprnn'
 --[[ utils ]]--
-torch.include('dp', 'utils/utils.lua')
-print('load utils done')
-torch.include('dp', 'utils/underscore.lua')
-print('load utils underscore')
-torch.include('dp', 'utils/os.lua')
-print('load utils os')
-torch.include('dp', 'utils/table.lua')
-print('load utils table')
-torch.include('dp', 'utils/torch.lua')
-torch.include('dp', 'utils/ucf101_helper.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'utils/utils.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'utils/underscore.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'utils/os.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'utils/table.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'utils/torch.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'utils/ucf101_helper.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'utils/helper.lua'))
 --[[ directory structure ]]--
 dp.DATA_DIR = os.getenv('DEEP_DATA_PATH') 
    or paths.concat(dp.TORCH_DIR, 'data')
@@ -48,97 +47,99 @@ dp.UNIT_DIR = os.getenv('DEEP_UNIT_PATH')
 dp.mkdir(dp.UNIT_DIR)
    
 --[[ misc ]]--
-torch.include('dp', 'xplog.lua')
-torch.include('dp', 'mediator.lua')
-torch.include('dp', 'objectid.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'xplog.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'mediator.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'objectid.lua'))
 
 --[[ view ]]--
-torch.include('dp', 'view/view.lua')
-torch.include('dp', 'view/dataview.lua')
-torch.include('dp', 'view/imageview.lua')
-torch.include('dp', 'view/classview.lua')
-torch.include('dp', 'view/sequenceview.lua')
-torch.include('dp', 'view/listview.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'view/view.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'view/dataview.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'view/imageview.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'view/classview.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'view/sequenceview.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'view/listview.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'view/videoview.lua'))
 
 --[[ dataset ]]--
 -- datasets
-torch.include('dp', 'data/baseset.lua') -- abstract class
-torch.include('dp', 'data/dataset.lua')
-torch.include('dp', 'data/sentenceset.lua')
-torch.include('dp', 'data/textset.lua')
-torch.include('dp', 'data/imageclassset.lua')
-torch.include('dp', 'data/batch.lua')
-
+dofile(paths.concat(dp.DPRNN_DIR, 'data/baseset.lua')) -- abstract class
+dofile(paths.concat(dp.DPRNN_DIR, 'data/dataset.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/sentenceset.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/textset.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/imageclassset.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/batch.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/videoclassset.lua'))
 --[[ datasource ]]--
 -- generic datasources
-torch.include('dp', 'data/datasource.lua')
-torch.include('dp', 'data/imagesource.lua')
-torch.include('dp', 'data/smallimagesource.lua')
-torch.include('dp', 'data/textsource.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'data/datasource.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/imagesource.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/smallimagesource.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/textsource.lua'))
 -- specific image datasources
-torch.include('dp', 'data/mnist.lua')
-torch.include('dp', 'data/cifar10.lua')
-torch.include('dp', 'data/cifar100.lua')
-torch.include('dp', 'data/notmnist.lua')
-torch.include('dp', 'data/facialkeypoints.lua')
-torch.include('dp', 'data/svhn.lua')
-torch.include('dp', 'data/imagenet.lua')
-torch.include('dp', 'data/facedetection.lua')
-torch.include('dp', 'data/translatedmnist.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'data/ucf101.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/mnist.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/cifar10.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/cifar100.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/notmnist.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/facialkeypoints.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/svhn.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/imagenet.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/facedetection.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/translatedmnist.lua'))
 -- specific text datasources
-torch.include('dp', 'data/billionwords.lua')
-torch.include('dp', 'data/penntreebank.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'data/billionwords.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'data/penntreebank.lua'))
 
 --[[ sampler ]]--
-torch.include('dp', 'sampler/sampler.lua')
-torch.include('dp', 'sampler/shufflesampler.lua')
-torch.include('dp', 'sampler/sentencesampler.lua')
-torch.include('dp', 'sampler/randomsampler.lua')
-torch.include('dp', 'sampler/textsampler.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'sampler/sampler.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'sampler/shufflesampler.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'sampler/sentencesampler.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'sampler/randomsampler.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'sampler/textsampler.lua'))
 
 --[[ preprocess ]]--
-torch.include('dp', 'preprocess/preprocess.lua')
-torch.include('dp', 'preprocess/pipeline.lua')
-torch.include('dp', 'preprocess/parallelpreprocess.lua')
-torch.include('dp', 'preprocess/binarize.lua')
-torch.include('dp', 'preprocess/standardize.lua')
-torch.include('dp', 'preprocess/gcn.lua')
-torch.include('dp', 'preprocess/zca.lua')
-torch.include('dp', 'preprocess/lecunlcn.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'preprocess/preprocess.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'preprocess/pipeline.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'preprocess/parallelpreprocess.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'preprocess/binarize.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'preprocess/standardize.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'preprocess/gcn.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'preprocess/zca.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'preprocess/lecunlcn.lua'))
 
 --[[ propagator ]]--
-torch.include('dp', 'propagator/propagator.lua')
-torch.include('dp', 'propagator/optimizer.lua')
-torch.include('dp', 'propagator/evaluator.lua')
-torch.include('dp', 'propagator/experiment.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'propagator/propagator.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'propagator/optimizer.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'propagator/evaluator.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'propagator/experiment.lua'))
 
 --[[ feedback ]]--
-torch.include('dp', 'feedback/feedback.lua')
-torch.include('dp', 'feedback/compositefeedback.lua')
-torch.include('dp', 'feedback/confusion.lua')
-torch.include('dp', 'feedback/perplexity.lua')
-torch.include('dp', 'feedback/topcrop.lua')
-torch.include('dp', 'feedback/fkdkaggle.lua')
-torch.include('dp', 'feedback/facialkeypointfeedback.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'feedback/feedback.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'feedback/compositefeedback.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'feedback/confusion.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'feedback/perplexity.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'feedback/topcrop.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'feedback/fkdkaggle.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'feedback/facialkeypointfeedback.lua'))
 
 --[[ observer ]]--
-torch.include('dp', 'observer/observer.lua')
-torch.include('dp', 'observer/compositeobserver.lua')
-torch.include('dp', 'observer/logger.lua')
-torch.include('dp', 'observer/errorminima.lua')
-torch.include('dp', 'observer/earlystopper.lua')
-torch.include('dp', 'observer/savetofile.lua') --not an observer (but used in one)
-torch.include('dp', 'observer/adaptivedecay.lua')
-torch.include('dp', 'observer/filelogger.lua')
-torch.include('dp', 'observer/hyperlog.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/observer.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/compositeobserver.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/logger.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/errorminima.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/earlystopper.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/savetofile.lua')) --not an observer (but used in one)
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/adaptivedecay.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/filelogger.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/hyperlog.lua'))
 
 --[[ nn ]]--
-torch.include('dp', 'nn/Print.lua')
-torch.include('dp', 'nn/FairLookupTable.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'nn/Print.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'nn/FairLookupTable.lua'))
 
 --[[ test ]]--
-torch.include('dp', 'test/test.lua')
-torch.include('dp', 'test/test-cuda.lua')
-torch.include('dp', 'test/test-datasets.lua')
+dofile(paths.concat(dp.DPRNN_DIR, 'test/test.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'test/test-cuda.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'test/test-datasets.lua'))
 
 return dp
