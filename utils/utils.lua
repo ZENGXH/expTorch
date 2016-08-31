@@ -1,3 +1,4 @@
+local log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
 function string.tomodule(modulename,splitter)
    splitter = splitter or '[.]'
    assert(type(modulename) == 'string')
@@ -240,6 +241,10 @@ function Queue:__init()
    self.list = {}
 end
 
+function Queue:length()
+    return #self.list
+end
+
 function Queue:put(value)
    local first = self.first - 1
    self.first = first
@@ -247,7 +252,9 @@ function Queue:put(value)
 end
 
 function Queue:empty()
-   return self.first > self.last
+   local isEmpty = (self.first > self.last)
+   log.trace('Queue empty? ', isEmpty)
+   return isEmpty
 end
  
 function Queue:get()

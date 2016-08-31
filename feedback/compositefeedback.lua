@@ -16,7 +16,7 @@ function CompositeFeedback:__init(config)
        help='list of feedbacks'}
    )
    self._feedbacks = feedbacks
-   config.name = 'compositefeedback'
+   config.name = config.name or 'compositefeedback'
    parent.__init(self, config)
 end
 

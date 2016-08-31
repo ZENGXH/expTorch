@@ -5,8 +5,13 @@
 -- training data from the test data. The Evaluator can also be used 
 -- for early-stoping.
 ------------------------------------------------------------------------
-local Evaluator = torch.class("dp.Evaluator", "dp.Propagator")
+local Evaluator, parent = torch.class("dp.Evaluator", "dp.Propagator")
 Evaluator.isEvaluator = true
+
+function Evaluator:__init(config)
+    parent.__init(self, config)
+end
+
 
 function Evaluator:propagateBatch(batch, report) 
    self._model:evaluate()

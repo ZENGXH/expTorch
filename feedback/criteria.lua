@@ -2,16 +2,16 @@
 -- convert for use with dp.Loss instread of nn.Criteria.
 -- make non-composite
 ------------------------------------------------------------------------
---[[ LossFeedback ]]--
+--[[ Criteria ]]--
 -- Feedback
 -- Adapter that feeds back and accumulates the error of one or many
 -- nn.Criterion. Each supplied nn.Criterion requires a name for 
 -- reporting purposes. Default name is typename minus module name(s)
 ------------------------------------------------------------------------
-local LossFeedback, parent = torch.class("dp.LossFeedback", "dp.Feedback")
-LossFeedback.isLossFeedback = true
+local Criteria, parent = torch.class("dp.Criteria", "dp.Feedback")
+Criteria.isCriteria = true
 
-function LossFeedback:__init(config)
+function Criteria:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args, criteria, name, typename_pattern = xlua.unpack(
       {config},
@@ -25,7 +25,6 @@ function LossFeedback:__init(config)
    )
    config.name = name
    parent.__init(self, config)
-   
    self._criteria = {}
    self._name = name
    if torch.typename(criteria) then
@@ -39,22 +38,9 @@ function LossFeedback:__init(config)
       end
    end
    
-   for i,v in ipairs(criteria) do
+   for i, v in ipairs(criteria) do
       -- for listed criteria, default name is derived from typename
-      local k = _.split(torch.typename(criteria), '[.]')
-      k = k[#k]
-      -- remove suffix 'Criterion'
-      if string.sub(k, -9) == 'Criterion' then
-         k = string.sub(k, 1, -10)
-      end
-      -- make lowercase
-      k = string.lower(k)
-      self._criteria[k] = v
-   end
-   if typepattern ~= '' then
-      for k,v in pairs(self._criteria) do
-         assert(typepattern(v,typepattern), "Invalid criteria typename")
-      end
+      self._criteria[i] = v
    end
    
    self._errors = {}
@@ -63,7 +49,9 @@ end
 
 function Criteria:_reset()
    -- reset error sums to zero
-   for k,v in self._criteria do
+   self.log.info('resetting: ', self._criteria)
+   for k, v in pairs(self._criteria) do
+      self.log.info('resetting: ', v)
       self._errors[k] = 0
    end
 end
@@ -76,8 +64,11 @@ function Criteria:_add(batch, output, carry, report)
    else
        new_output = output
    end
-   for k, v in self._criteria do
-      current_error = v:forward(new_output.act:data(), batch:targets():data())
+    assert(torch.isTensor(new_output))
+   for k, v in pairs(self._criteria) do
+      -- current_error = v:forward(new_output.act:data(), batch:targets():data())
+      
+      current_error = v:forward(new_output, batch:targets():input())
       self._errors[k] =  (
                               ( self._n_sample * self._errors[k] ) 
                               + 

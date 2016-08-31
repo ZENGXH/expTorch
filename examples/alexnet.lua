@@ -112,6 +112,7 @@ model:add(nn.Convert(),1)
 model:add(features)
 model:add(classifier)
 
+
 --[[Propagators]]--
 train = dp.Optimizer{
    acc_update = opt.accUpdate,
@@ -130,7 +131,9 @@ train = dp.Optimizer{
    end,
    feedback = dp.Confusion(),
    sampler = dp.RandomSampler{
-      batch_size=opt.batchSize, epoch_size=opt.trainEpochSize, ppf=ppf
+      batch_size=opt.batchSize, 
+      epoch_size=opt.trainEpochSize, 
+      ppf=ppf
    },
    progress = opt.progress
 }

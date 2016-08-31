@@ -1,4 +1,5 @@
 local ucf101_helper = {}
+local log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
 -- read the train_list_split.txt and convert it into data_dict in lua format
 -- @param video_list the txt file to be processed
 -----------
@@ -19,7 +20,7 @@ function ucf101_helper.ReadGTText2DataDict(
 
     for class in classID:lines() do
         local index_class = #classes + 1
-        print('push: ',index_class, class)
+        -- log.trace('push: ',index_class, class)
         classes[index_class] = class
         classIndices[class] = index_class
         classListVideo[index_class] = {}
@@ -27,7 +28,7 @@ function ucf101_helper.ReadGTText2DataDict(
     classID:close()
 
     -- get video infomation
-    print(string.format('open %s to read', video_list))
+    -- print(string.format('open %s to read', video_list))
     local file = io.open(video_list, 'r')
     assert(file ~= nil, video_list..'not exist')
     local data = {}
@@ -69,8 +70,8 @@ function ucf101_helper.ReadGTText2DataDict(
 
     data_dict.video_num = #data
     data_dict.data = data
-    print('[ReadGTText2DataDict] done, max_length ', torch.Tensor(videoLength):max(), 
-                ' return data_dict in size, ', #videoLength)
+    -- print('[ReadGTText2DataDict] done, max_length ', torch.Tensor(videoLength):max(), 
+    --            ' return data_dict in size, ', #videoLength)
     return data_dict
 end
 
@@ -103,7 +104,7 @@ function ucf101_helper.MvFile(input_file, root, reduce_length, seg5_bin_path)
             -- os.execute(cmd)
         end
         torch.save(paths.concat(all_video_path, title..'.bin'), concat)
-        print('done ', sample_id )
+        -- print('done ', sample_id )
     end
 end
 
@@ -132,7 +133,7 @@ function ucf101_helper.LoadBinFile(filepath, datatype)
 end
 
 
-print('load ucf101_helper done')
+-- print('load ucf101_helper done')
 return ucf101_helper
 
 

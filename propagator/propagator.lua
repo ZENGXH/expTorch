@@ -11,13 +11,14 @@ Propagator.isPropagator = true
 
 function Propagator:__init(config)   
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args 
+   local args = {} 
    -- loss, callback, epoch_callback, sampler, observer, 
    --   feedback, progress, verbose, stats = xlua.unpack(
    dp.helper.unpack_config(args, {config}, 'Propagator', 
       'Propagates Batches sampled from a DataSet using a Sampler '..
       'through a Model in order to evaluate a Loss, provide Feedback '.. 
       'or train the model',
+      {arg='name', type='string', default='propagator', help='name of the Propagator'},
       {arg='loss', type='nn.Criterion',
        help='a neural network Criterion to evaluate or minimize'},
       {arg='callback', type='function',
@@ -40,6 +41,8 @@ function Propagator:__init(config)
        help='display performance statistics (speed, etc). '..
       'Only applies if verbose is true.'}
    )
+   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log.SetLoggerName(args.name)
    self:sampler(args.sampler or dp.Sampler())
    self:loss(args.loss) -- setup Criterion
    self:observer(args.observer)
@@ -53,8 +56,9 @@ end
 
 function Propagator:setup(config)
    assert(type(config) == 'table', "Setup requires key-value arguments")
-   local args, id, model, mediator, target_module = xlua.unpack(
-      {config},
+   local args = {}
+   -- id, model, mediator, target_module = xlua.unpack(
+   dp.helper.unpack_config(args,{config},
       'Propagator:setup', 
       'Post-initialization setup of the Propagator',
       {arg='id', type='dp.ObjectID', req=true,
@@ -69,26 +73,39 @@ function Propagator:setup(config)
       {arg='target_module', type='nn.Module', 
        help='Optional module through which targets can be forwarded'}
    )
+   local id = args.id
+   local model = args.model
+   local mediator = args.mediator
+   local target_module = args.target_module
+
    assert(torch.isTypeOf(id, 'dp.ObjectID'))
-   self._id = id
-   assert(torch.isTypeOf(mediator, 'dp.Mediator'))
-   self._mediator = mediator
-   self:model(model)
-   self._target_module = target_module or nn.Identity()
+   assert(torch.isTypeOf(args.mediator, 'dp.Mediator'))
+   self._id = args.id
+   self._mediator = args.mediator
+   self:model(args.model)
+   self._target_module = args.target_module or nn.Identity()
    self._sampler:setup{mediator=mediator, model=model}
+   
    if self._observer then 
        self._observer:setup{mediator=mediator, subject=self} 
    end
+
    if self._feedback then 
-       self._feedback:setup{mediator=mediator, propagator=self, dataset=dataset} 
+       self._feedback:setup{mediator=mediator, 
+            propagator=self, 
+            dataset=dataset} 
    end
+   
    if self._visitor then 
-       self._visitor:setup{mediator=mediator, model=self._model, propagator=self} 
+       self._visitor:setup{mediator=mediator, 
+            model=self._model, 
+            propagator=self} 
    end
 end
 
--- create sampler for current dataset, call propagateBatch recurrently
---
+-- create sampler for current dataset, 
+-- pass model and report to self._epoch_callback()
+-- call propagateBatch recurrently
 function Propagator:propagateEpoch(dataset, report)
    self.sumErr = 0
    if self._feedback then
@@ -165,9 +182,10 @@ function Propagator:forward(batch)
    end
    -- useful for calling accUpdateGradParameters in callback function
    self._model.dpnn_input = input
-   
+   log.trace('forward to model:.... ')   
    -- forward propagate through model
    self.output = self._model:forward(input)
+   log.trace('\t forward done ')   
    
    if not self._loss then
       return

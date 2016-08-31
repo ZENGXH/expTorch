@@ -8,13 +8,10 @@ function helper.unpack(obj, args, funcname, description, ...)
     helper.unpack_config(obj, args, funcname, description, ...)
 end
 
-function helper.unpack_config(obj, args, funcname, description, ...)
-    xlua.unpack_class(object, args, funcname, description, ...)
-    local args = xlua.unpack(args, funcname, description, ...)
+function helper.unpack_config(object, args, funcname, description, ...)
+    local dargs = xlua.unpack(args, funcname, description, ...)
       for k,v in pairs(dargs) do
-            if type(k) ~= 'number' then
-                object[k] = v
-            end
+        object[k] = v
       end
 end
 

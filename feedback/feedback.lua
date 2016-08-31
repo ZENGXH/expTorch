@@ -19,7 +19,7 @@ function Feedback:__init(config)
       {arg='verbose', type='boolean', default=true,
        help='provide verbose outputs every epoch'},
       {arg='selected_output', type='number', default=0,
-       help='works for output as table, report on only part of the ourput, if sero then no selection'}
+       help='works for output as table, report on only part of the ourput, if sero then no selection'},
       {arg='name', type='string', req=true,
        help='used to identify report'}
    )

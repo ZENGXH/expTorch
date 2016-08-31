@@ -8,14 +8,16 @@ Optimizer.isOptimizer = true
 
 function Optimizer:__init(config)
    config = config or {}
-   local args, loss, sampler, acc_update, callback, update_interval, 
-      stats = xlua.unpack(
-      {config},
+   config.name = config.name or 'Optimizer'
+   local args = {}
+   --loss, sampler, acc_update, callback, update_interval, 
+   --   stats = xlua.unpack(
+   dp.helper.unpack_config(args,{config},
       'Optimizer', 
       'Optimizes a model on a training dataset',
       {arg='loss', type='nn.Criterion', req=true,
        help='a neural network Criterion to evaluate or minimize'},
-      {arg='sampler', type='dp.Sampler', 
+      {arg='sampler', type='dp.Sampler', default=dp.ShuffleSampler(),
        help='used to iterate through the train set. ' ..
        'Defaults to dp.ShuffleSampler()'},
       {arg='acc_update', type='boolean', default=false,
@@ -31,12 +33,8 @@ function Optimizer:__init(config)
       {arg='stats', type='boolean', default=true,
        help='display statistics'}
    )
-   self._update_interval = update_interval
-   self._acc_update = acc_update
-   config.loss = loss
-   config.callback = callback
-   config.sampler = sampler or dp.ShuffleSampler()
-   config.stats = stats
+   self._update_interval = args.update_interval
+   self._acc_update = args.acc_update
    parent.__init(self, config)
 end
 
