@@ -11,8 +11,9 @@ local ImageClassSet, parent = torch.class("dp.ImageClassSet", "dp.DataSet")
 
 ImageClassSet._input_shape = 'bchw'
 ImageClassSet._output_shape = 'b'
-
+ImageClassSet.isImageClassSet = true
 function ImageClassSet:__init(config)
+   parent.__init(self, config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args = {}
    -- data_path, load_size, sample_size, sample_func, which_set,  
@@ -54,9 +55,7 @@ function ImageClassSet:__init(config)
    -- locals
    self:whichSet(args.which_set)
    self._load_size = args.load_size
-   assert(self._load_size[1] == 3, "ImageClassSet doesn't yet support greyscaling : load_size")
    self._sample_size = args.sample_size or self._load_size
-   assert(self._sample_size[1] == 3, "ImageClassSet doesn't yet support greyscaling : sample_size")
    self._verbose = args.verbose   
    self._data_path = type(args.data_path) == 'string' and {args.data_path} or args.data_path
    self._sample_func = args.sample_func
@@ -64,13 +63,16 @@ function ImageClassSet:__init(config)
    self._sort_func = args.sort_func
    self._cache_mode = args.cache_mode
    self._cache_path = args.cache_path or paths.concat(self._data_path[1], 'cache.th7')
-   
+   self._class_set = 'ImageClassSet' 
    -- indexing and caching
-   assert(_.find({'writeonce','overwrite','nocache','readonly'},cache_mode), 'invalid cache_mode :'..cache_mode)
+   assert(_.find({'writeonce','overwrite','nocache','readonly'}, self._cache_mode), 'invalid cache_mode :'..self._cache_mode)
+
    local cacheExists = paths.filep(self._cache_path)
+   
+    self.log.info(' cache_mode: ', args.cache_mode)
    if args.cache_mode == 'readonly' or (args.cache_mode == 'writeonce' and args.cacheExists) then
-      if not args.cacheExists then
-         error"'readonly' cache_mode requires an existing cache, none found"
+      if not cacheExists then
+         error("'readonly' cache_mode requires an existing cache, none found in "..self._cache_path)
       end
       self:loadIndex()
    else
@@ -79,7 +81,6 @@ function ImageClassSet:__init(config)
          self:saveIndex()
       end
    end
-   
    -- buffers
    self._imgBuffers = {}
    
@@ -291,6 +292,7 @@ function ImageClassSet:buildIndex()
 end
 
 function ImageClassSet:batch(batch_size)
+   self.log.tracefrom('request batch with size ', batch_size)
    return dp.Batch{
       which_set=self._which_set,
       inputs=dp.ImageView('bchw', 
@@ -312,7 +314,7 @@ function ImageClassSet:nSample(class, list)
    end
 end
 
-function ImageClassSet: sub(batch, start, stop)
+function ImageClassSet:sub(batch, start, stop)
    if not stop then
       stop = start
       start = batch
@@ -423,6 +425,7 @@ end
 
 function ImageClassSet:loadImage(path)
    -- https://github.com/clementfarabet/graphicsmagick#gmimage
+   assert(self._load_size[1] == 3, "ImageClassSet doesn't yet support greyscaling : load_size")
    local lW, lH = self._load_size[3], self._load_size[2]
    -- load image with size hints
    local input = gm.Image():load(path, self._load_size[3], self._load_size[2])
@@ -548,6 +551,7 @@ function ImageClassSet:sampleTest(dst, path)
    local input = self:loadImage(path)
    iW, iH = input:size()
    
+   assert(self._sample_size[1] == 3, "ImageClassSet doesn't yet support greyscaling : sample_size")
    local oH = self._sample_size[2]
    local oW = self._sample_size[3];
    dst:resize(10, 3, oW, oH)
@@ -583,7 +587,7 @@ end
 ------------------------ multithreading --------------------------------
 
 function ImageClassSet:multithread(nThread)
-   nThread = nThread or 2
+   local nThread = nThread or 2
    if not paths.filep(self._cache_path) then
       -- workers will read a serialized index to speed things up
       self:saveIndex()
@@ -596,13 +600,15 @@ function ImageClassSet:multithread(nThread)
    
    local threads = require "threads"
    threads.Threads.serialization('threads.sharedserialize')
-
+   self.log.info('init threads with dataset: ', self._class_set)
    self._threads = threads.Threads(
       nThread,
       -- all function below will be executed in all thread
       function() -- make a separated f1 containing all the definitions 
-         require 'dp'
+        print('threading')
+        require 'dprnn.dprnn'
       end,
+    
       function(idx) -- other code in f2
          opt = options -- pass to all donkeys via upvalue
          tid = idx
@@ -612,7 +618,7 @@ function ImageClassSet:multithread(nThread)
          if config.verbose then
             print(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
          end
-         dataset = dp.ImageClassSet(config)
+         dataset = dp[self._class_set](config)
          tbatch = dataset:batch(1)
       end
    )
@@ -656,8 +662,8 @@ function ImageClassSet:subAsyncPut(batch, start, stop, callback)
    self._threads:addjob(
       -- the job callback (runs in data-worker thread)
       function()
-         tbatch:inputs():forward('bchw', input)
-         tbatch:targets():forward('b', target)
+         tbatch:inputs():forward(self._input_shape, input)
+         tbatch:targets():forward(self._output_shape, target)
          dataset:sub(tbatch, start, stop)
          return input, target
          -- the callback return one ore many values which will be 
@@ -668,8 +674,8 @@ function ImageClassSet:subAsyncPut(batch, start, stop, callback)
       function(input, target)
          local batch = self._send_batches:get()
          -- filling input data
-         batch:inputs():forward('bchw', input)
-         batch:targets():forward('b', target)
+         batch:inputs():forward(self._input_shape, input)
+         batch:targets():forward(self._output_shape, target)
          -- init call batch:setup and do preprocesses 
          callback(batch)
          
@@ -680,40 +686,60 @@ function ImageClassSet:subAsyncPut(batch, start, stop, callback)
 end
 
 function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
+   self.log.info('[sampleAsyncPut] with view in ', self._input_shape, ' for nSample ', nSample)
    self._iter_mode = self._iter_mode or 'sample'
    if (self._iter_mode ~= 'sample') then
       error'can only use one Sampler per async ImageClassSet (for now)'
    end  
    
-   if not batch then
+   if not batch or batch == nil then
+      self.log.trace('batch is nil size of buffer_batches: ', self._buffer_batches:length() )
       batch = (not self._buffer_batches:empty()) and self._buffer_batches:get() or self:batch(nSample)
+      self.log.trace('batch is now not nil')
+   else
+       self.log.trace('batch is nil')
    end
+
    local input = batch:inputs():input()
    local target = batch:targets():input()
-   assert(input and target)
+   assert(input)
+   assert(target)
    
+   local p = torch.pointer(input:storage()) 
    -- transfer the storage pointer over to a thread
-   local inputPointer = tonumber(ffi.cast('intptr_t', 
-        torch.pointer(input:storage())))
    local targetPointer = tonumber(ffi.cast('intptr_t', 
         torch.pointer(target:storage())))
+ 
+   self.log.trace('get target pointer')
+   local inputPointer = tonumber(ffi.cast('intptr_t', 
+        torch.pointer(input:storage())))
+   self.log.trace('get input pointer')
    input:cdata().storage = nil
    target:cdata().storage = nil
    
    self._send_batches:put(batch)
-   
+    
+   self.log.trace('put batch')
    assert(self._threads:acceptsjob())
+   self.log.trace('start add job')
    self._threads:addjob(
       -- the job callback (runs in data-worker thread)
       function()
          -- set the transfered storage
+         
+         print('setStorage')
          torch.setFloatStorage(input, inputPointer)
          torch.setIntStorage(target, targetPointer)
-         tbatch:inputs():forward('bchw', input)
+         local view =  'btchw'
+
+         tbatch:inputs():forward(view, input)
          tbatch:targets():forward('b', target)
+
+         print('forward')
          
          dataset:sample(tbatch, nSample, sampleFunc)
-         
+         assert(tbatch:inputs():input()) 
+         assert(tbatch:targets():input()) 
          -- transfer it back to the main thread
          local istg = tonumber(ffi.cast('intptr_t', 
             torch.pointer(input:storage())))
@@ -722,20 +748,22 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
          input:cdata().storage = nil
          target:cdata().storage = nil
          return input, target, istg, tstg
+     
       end,
 
       -- the endcallback (runs in the main thread)
       function(input, target, istg, tstg)
+          
          local batch = self._send_batches:get()
          torch.setFloatStorage(input, istg)
          torch.setIntStorage(target, tstg)
-         batch:inputs():forward('bchw', input)
+         batch:inputs():forward('btchw', input)
          batch:targets():forward('b', target)
-         
          callback(batch)
-         
          batch:targets():setClasses(self._classes)
+         -- self.log.trace('putting to _recv_batches: ', #self._recv_batches)
          self._recv_batches:put(batch)
+         
       end
    )
 end
@@ -743,9 +771,10 @@ end
 -- recv results from worker : get results from queue
 function ImageClassSet:asyncGet()
    -- necessary because Threads:addjob sometimes calls dojob...
+   self.log.info('asyncGet is called')
    if self._recv_batches:empty() then
       self._threads:dojob()
    end
-   
+
    return self._recv_batches:get()
 end

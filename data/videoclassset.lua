@@ -8,14 +8,14 @@
 -- currently not modify for frames-level-raw-video-frames input
 ------------------------------------------------------------------------
 
-local VideoClassSet, parent = torch.class("dp.VideoClassSet", "dp.DataSet")
+local VideoClassSet, parent = torch.class("dp.VideoClassSet", "dp.ImageClassSet")
 -- batch, timeStep, channels, height, width
 VideoClassSet._input_shape = 'btchw' 
 VideoClassSet._output_shape = 'b'
-
+VideoClassSet.isVieoClassSet = true
+VideoClassSet.isImageClassSet = true
 function VideoClassSet:__init(config)
-    parent.__init(self, config)
-    self.log.info('__init VideoClassSet', unpack(config))
+
     assert(type(config) == 'table', "Constructor requires key-value arguments")
     local args = {} 
     dp.helper.unpack_config(args,
@@ -45,7 +45,7 @@ function VideoClassSet:__init(config)
     {arg='which_set', type='string', default='train',
     help='"train", "valid" or "test" set'},
 
-    {arg='frames_per_select', type='number', default=1,
+    {arg='frames_per_select', type='number', req=true,
     help='num of frames to be select'},
     {arg='verbose', type='boolean', default=true,
     help='display verbose messages'},
@@ -60,7 +60,7 @@ function VideoClassSet:__init(config)
     'readonly : only read from cache, fail otherwise.'},
     {arg='cache_path', type='string', 
     help='Path to cache. Defaults to [data_path[1]]/cache.th7'},
-    {arg='io_helper', type='table', req=true, 
+    {arg='io_helper', type='table', req=true, default=dofile(paths.concat(dp.DPRNN_DIR, 'utils', 'ucf101_helper.lua')), 
     help='io_helper to helper pass the txt list'}
     )
     -- globals
@@ -73,28 +73,37 @@ function VideoClassSet:__init(config)
     self._sample_size = args.sample_size or self._load_size
     self._verbose = args.verbose   
     self._classID_file = args.classID_file
-    self._video_list = type(args.video_list) == 'string' and args.video_list
+    self._data_list = type(args.data_list) == 'string' and args.data_list
     self._data_path = type(args.data_path) == 'string' and {args.data_path} or args.data_path
     self.frames_per_select = args.frames_per_select
-    self.log.info('[videoclassset] _load_size:', self._load_size)
-    self.log.info('\t _sample_size;', unpack(self._sample_size))
-    self.log.info('\t _verbose:', self._verbose)
-    self.log.info('\t _classID_file:', self._classID_file)
-    self.log.info('\t _data_list:', self._video_list)
-    self.log.info('\t _data_path:', self._data_path[1])
-    self.log.info('\t get sample_func:', self.sample_func)
-    dp.helper.CheckFileExist(self._video_list)
+    dp.helper.CheckFileExist(self._data_list)
     dp.helper.CheckFileExist(self._data_path[1])
     self._sample_func = args.sample_func
     -- TODO: assert input argument sample_func is valid
     self._sort_func = args.sort_func
+    local cache_mode = args.cache_mode
     self._cache_mode = args.cache_mode
     self._cache_path = args.cache_path or paths.concat(self._data_path[1], 'cache.th7')
     self.io_helper = args.io_helper 
+    self.JoinTable = nn.JoinTable(1)
+    assert(self.io_helper)
     -- indexing and caching
     assert(_.find({'writeonce','overwrite','nocache','readonly'}, args.cache_mode), 'invalid cache_mode :'..args.cache_mode)
+
+    parent.__init(self, config)
+    self.log.info('[videoclassset] _load_size:', self._load_size,
+    '\t frames_per_select', self.frames_per_select,
+    '\t _sample_size;', unpack(self._sample_size),
+    '\t _verbose:', self._verbose,
+    '\t _classID_file:', self._classID_file,
+    '\t _data_list:', self._data_list,
+    '\t _data_path:', self._data_path[1],
+    '\t get sample_func:', self.sample_func)
+ 
+    -- self.log.info('__init VideoClassSet', unpack(config))
+    -- build index in parent
+    --[[
     local cacheExists = paths.filep(self._cache_path)
-    self.log.info('[VideoClassSet] cache_mode: ', args.cache_mode)
     if cache_mode == 'readonly' or (args.cache_mode == 'writeonce' and args.cacheExists) then
         if not cacheExists then
             error"'readonly' cache_mode requires an existing cache, none found"
@@ -110,9 +119,11 @@ function VideoClassSet:__init(config)
 
     -- buffers
     self._imgBuffers = {}
-
     -- required for multi-threading
     self._config = args.config 
+    ]]--
+    self._class_set = 'VideoClassSet' 
+    assert(self._input_shape == VideoClassSet._input_shape)
 end
 
 function VideoClassSet:saveIndex()
@@ -184,9 +195,8 @@ function VideoClassSet:buildIndex()
     local videoLength = {}
     local videoPath = {}
 
-
     local data_dict = self.io_helper.ReadGTText2DataDict(
-        self._classID_file, self._video_list, 
+        self._classID_file, self._data_list, 
         classList, classes, classListVideo, classIndices,
         videoList, videoIndices, videoLabel, videoLength, videoPath)
 
@@ -244,12 +254,13 @@ function VideoClassSet:buildIndex()
 end
 
 function VideoClassSet:batch(batch_size)
+   self.log.tracefrom('request batch with size ', batch_size, ' sample_size(input) ', unpack(self._sample_size))
     return dp.Batch{
         which_set=self._which_set,
-        inputs=dp.ImageView('bchw', 
-        torch.FloatTensor(batch_size, unpack(self._sample_size))),
-        targets=dp.ClassView('b', 
-        torch.IntTensor(batch_size))
+        inputs=dp.VideoView(self._input_shape, 
+            torch.FloatTensor(batch_size, self.frames_per_select, unpack(self._sample_size))),
+        targets=dp.ClassView(self._output_shape, 
+            torch.IntTensor(batch_size))
     }
 end
 
@@ -266,16 +277,20 @@ function VideoClassSet:nSample(class, list)
 end
 
 function VideoClassSet:sub(batch, start, stop)
-    if not stop then
-        stop = start
-        start = batch
-        batch = nil
-    end
-    -- inie a batch nil
-    batch = batch or dp.Batch{
-        which_set=self:whichSet(), 
-        epoch_size=self:nSample()
-    }
+    if (not batch or batch == nil) or (not stop or stop == nil) then
+        if batch or batch ~= nil then -- first arg exist, third not exist
+            stop = start
+            start = batch
+        end
+        self.log.trace('building batch with size ', self:nSample())
+
+        -- inie a batch nil
+        batch = dp.Batch{
+            which_set=self:whichSet(), 
+            epoch_size=self:nSample()
+        }
+   end
+
     -- convert [string] self._sample_func to [function] sampleFunc
     local sampleFunc = self._sample_func
     if torch.type(sampleFunc) == 'string' then
@@ -342,8 +357,8 @@ function VideoClassSet:index(batch, indices)
     self:tableToTensor(inputTable, targetTable, inputTensor, targetTensor)
 
     -- assert(inputTensor:size(2) == 3)
-    inputView:forward('bchw', inputTensor)
-    targetView:forward('b', targetTensor)
+    inputView:forward(self._input_shape, inputTensor)
+    targetView:forward(self._output_shape, targetTensor)
     targetView:setClasses(self._classes)
     batch:inputs(inputView)
     batch:targets(targetView)
@@ -351,47 +366,42 @@ function VideoClassSet:index(batch, indices)
 end
 
 -- converts a table of samples (and corresponding labels) to tensors
+-- different with ImageClassSet, cause multi-framesPerDraw only corresponding to 1 output
 function VideoClassSet:tableToTensor(inputTable, targetTable, inputTensor, targetTensor)
     -- inputTensor possible shape: (t, c, h, w) or (t, c) or (1, c, h, w) or (1, c) or (c) or (c, h, w)
     inputTensor = inputTensor or torch.FloatTensor()
     targetTensor = targetTensor or torch.IntTensor()
     local n = #targetTable -- batchSize
 
-    local framesPerDraw = (inputTable[1]:dim() == 1 or 3) and 1 or inputTable[1]:size(1)
-    inputTensor:resize(n, framesPerDraw, unpack(self._sample_size))
+    inputTensor:resize(n, self.frames_per_select, unpack(self._sample_size)):copy(self.JoinTable:forward(inputTable))
     targetTensor:resize(n)
-
-    for i = 1, n do
-        inputTensor[i]:copy(inputTable[i])
+    --[[
+    for i = 1, #inputTable do
+        inputTable[i] = inputTable[i]:view(1, self.frames_per_select, unpack(self._sample_size))
         targetTensor[i] = targetTable[i]
     end
+    inputTensor:copy(nn.JoinTable(1):forward(inputTable))
+    ]]--
+     
+    for i = 1, n do
+        targetTensor[i] = targetTable[i]
+    end
+    
     assert(inputTensor)
     assert(targetTensor)
     return inputTensor, targetTensor
 end
 
 function VideoClassSet:loadImage(path)
-    -- https://github.com/clementfarabet/graphicsmagick#gmimage
-    local lW, lH = self._load_size[3], self._load_size[2]
-    -- load image with size hints
-    local input = gm.Image():load(path, self._load_size[3], self._load_size[2])
-    -- resize by imposing the smallest dimension (while keeping aspect ratio)
-    local iW, iH = input:size()
-    if iW/iH < lW/lH then
-        input:size(nil, lW)
-    else
-        input:size(nil, lH)
-    end
-    return input
+    return self:loadVideo(path)
 end
 
 -- return a table contain all frames of the video 
 function VideoClassSet:loadVideo(path)
     local video_path = paths.concat(self._data_path[1], path)
-    self.log.info('[loadVideo] ', video_path)
+    self.log.trace('[loadVideo] ', video_path)
     local concat = torch.load(video_path)
     local data = concat.data
-    assert(data)
     return data
 end
 
@@ -404,10 +414,6 @@ function VideoClassSet:loadVideoWithChecking(path, length, title, label)
     return concat.data
 end
 
-function VideoClassSet:getImageBuffer(i)
-    self._imgBuffers[i] = self._imgBuffers[i] or torch.FloatTensor()
-    return self._imgBuffers[i]
-end
 
 -- driver to call the specific sample_function, in a batch_size view
 -- Sample a class uniformly, and then uniformly samples example from class.
@@ -449,7 +455,7 @@ function VideoClassSet:sample(batch, nSample, sampleFunc)
 
         self.log.trace('get videopath: ', videoPath)
         local dst = self:getImageBuffer(i)
-        dst = sampleFunc(self, dst, videoPath)
+        dst = sampleFunc(self, dst, videoPath) -- enlarge size from 4d to 5d
         table.insert(inputTable, dst)
         table.insert(targetTable, index_class)  
     end
@@ -478,20 +484,6 @@ function VideoClassSet:sample(batch, nSample, sampleFunc)
     return batch
 end
 
--- by default, just load the image and return it
-function VideoClassSet:sampleDefault(dst, path)
-    if not path then
-        path = dst
-        dst = torch.FloatTensor()
-    end
-    if not dst then
-        dst = torch.FloatTensor()
-    end
-    -- if load_size[1] == 1, converts to greyscale (y in YUV)
-    local out = self:loadVideo(path)
-    return out
-end
-
 function VideoClassSet:sampleVolume(dst, path)
     local frames_per_select 
     if path then
@@ -517,16 +509,23 @@ function VideoClassSet:sampleVolume(dst, path)
     local num_frames = #out
     local index_start = torch.random(1, num_frames)
     local i = 1
-    for index = index_start, math.min(index_start + frames_per_select - 1, num_frames) do
-        dst[i]:copy(out[index]:view(unpack(self._load_size)))
-        i = i + 1
+    local copy_end = math.min(index_start + frames_per_select - 1, num_frames)
+    local copy_frames = copy_end - index_start + 1
+    local narrowTable = nn.NarrowTable(index_start, copy_end-index_start+1) -- offset, length
+    local output_select = narrowTable:forward(out)
+
+    -- if out[1]:dim() == 1 then -- so sad we can not use Join
+    for i = 1, #output_select do
+        output_select[i] = output_select[i]:view(1, unpack(self._sample_size)) -- all from 1024 -> 1, 1024, 1, 1
     end
-    return dst
+    dst:narrow(1, 1, copy_frames):copy(self.JoinTable:forward(output_select))
+
+    return dst:view(1, frames_per_select, unpack(self._sample_size)) -- 5D
 end
 
 -- function to load the image, jitter it appropriately (random crops etc.)
 function VideoClassSet:sampleTrain(dst, path)
-    error('not implement')
+    self:sampleVolume(dst, path)
     return dst
 end
 
@@ -543,173 +542,3 @@ function VideoClassSet:sampleValid(dst, path)
     error('not implement')
 end
 
-function VideoClassSet:classes()
-    return self._classes
-end
-
------------------------- multithreading --------------------------------
-
-function VideoClassSet:multithread(nThread)
-    nThread = nThread or 2
-    if not paths.filep(self._cache_path) then
-        -- workers will read a serialized index to speed things up
-        self:saveIndex()
-    end
-
-    local mainSeed = os.time()
-    local config = self._config
-    config.cache_mode = 'readonly'
-    config.verbose = self._verbose
-
-    local threads = require "threads"
-    threads.Threads.serialization('threads.sharedserialize')
-
-    self._threads = threads.Threads(
-    nThread,
-    -- all function below will be executed in all thread
-    function() -- make a separated f1 containing all the definitions 
-        require 'dprnn'
-    end,
-    function(idx) -- other code in f2
-        opt = options -- pass to all donkeys via upvalue
-        tid = idx
-        local seed = mainSeed + idx
-        math.randomseed(seed)
-        torch.manualSeed(seed)
-        if config.verbose then
-            print(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
-        end
-        dataset = dp.VideoClassSet(config)
-        tbatch = dataset:batch(1)
-    end
-    )
-
-    self._send_batches = dp.Queue() -- batches sent from main to threads
-    self._recv_batches = dp.Queue() -- batches received in main from threads
-    self._buffer_batches = dp.Queue() -- buffered batches
-
-    -- public variables
-    self.nThread = nThread
-    self.isAsync = true
-end
-
--- pull batches from self._recv_batches and push to _buffer_batches
-function VideoClassSet:synchronize()
-    self._threads:synchronize()
-    while not self._recv_batches:empty() do
-        self._buffer_batches:put(self._recv_batches:get())
-    end
-end
-
--- send request to worker : put request into queue
--- create a batch with batch_size (stop-start+1)
--- put into self._send_batches
--- add thread job, in which :sub is call in data-worker thread
--- main-thread get batch from ._send_batches and put into _recv_batches
-function VideoClassSet:subAsyncPut(batch, start, stop, callback)   
-    if not batch then
-        -- get a batch from _buffer_batches or create a new batch
-        -- and pre-filled the [dataView] input abd target
-        batch = (not self._buffer_batches:empty()) and self._buffer_batches:get() or self:batch(stop-start+1)
-    end
-
-    local input = batch:inputs():input()
-    local target = batch:targets():input()
-
-    assert(batch:inputs():input() and batch:targets():input())
-
-    self._send_batches:put(batch)
-
-    self._threads:addjob(
-    -- the job callback (runs in data-worker thread)
-    function()
-        tbatch:inputs():forward('btchw', input)
-        tbatch:targets():forward('b', target)
-        dataset:sub(tbatch, start, stop)
-        return input, target
-        -- the callback return one ore many values which will be 
-        -- serialized and unserialized as arguments to the endcallback function. 
-    end,
-
-    -- the endcallback (runs in the main thread)
-    function(input, target)
-        local batch = self._send_batches:get()
-        -- filling input data
-        batch:inputs():forward('btchw', input)
-        batch:targets():forward('b', target)
-        -- init call batch:setup and do preprocesses 
-        callback(batch)
-
-        batch:targets():setClasses(self._classes)
-        self._recv_batches:put(batch)
-    end
-    )
-end
-
-function VideoClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
-    self._iter_mode = self._iter_mode or 'sample'
-    if (self._iter_mode ~= 'sample') then
-        error'can only use one Sampler per async VideoClassSet (for now)'
-    end  
-
-    if not batch then
-        batch = (not self._buffer_batches:empty()) and self._buffer_batches:get() or self:batch(nSample)
-    end
-    local input = batch:inputs():input()
-    local target = batch:targets():input()
-    assert(input and target)
-
-    -- transfer the storage pointer over to a thread
-    local inputPointer = tonumber(ffi.cast('intptr_t', torch.pointer(input:storage())))
-    local targetPointer = tonumber(ffi.cast('intptr_t', torch.pointer(target:storage())))
-    input:cdata().storage = nil
-    target:cdata().storage = nil
-
-    self._send_batches:put(batch)
-
-    assert(self._threads:acceptsjob())
-    self._threads:addjob(
-    -- the job callback (runs in data-worker thread)
-    function()
-        -- set the transfered storage
-        torch.setFloatStorage(input, inputPointer)
-        torch.setIntStorage(target, targetPointer)
-        tbatch:inputs():forward('bchw', input)
-        tbatch:targets():forward('b', target)
-
-        dataset:sample(tbatch, nSample, sampleFunc)
-
-        -- transfer it back to the main thread
-        local istg = tonumber(ffi.cast('intptr_t', 
-        torch.pointer(input:storage())))
-        local tstg = tonumber(ffi.cast('intptr_t', 
-        torch.pointer(target:storage())))
-        input:cdata().storage = nil
-        target:cdata().storage = nil
-        return input, target, istg, tstg
-    end,
-
-    -- the endcallback (runs in the main thread)
-    function(input, target, istg, tstg)
-        local batch = self._send_batches:get()
-        torch.setFloatStorage(input, istg)
-        torch.setIntStorage(target, tstg)
-        batch:inputs():forward('bchw', input)
-        batch:targets():forward('b', target)
-
-        callback(batch)
-
-        batch:targets():setClasses(self._classes)
-        self._recv_batches:put(batch)
-    end
-    )
-end
-
--- recv results from worker : get results from queue
-function VideoClassSet:asyncGet()
-    -- necessary because Threads:addjob sometimes calls dojob...
-    if self._recv_batches:empty() then
-        self._threads:dojob()
-    end
-    return self._recv_batches:get()
-end

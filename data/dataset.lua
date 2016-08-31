@@ -38,6 +38,7 @@ end
 -- builds a batch (factory method)
 -- reuses the inputs and targets (so don't modify them)
 function DataSet:batch(batch_size)
+   self.log.trace('calling batch with batch_size: ', batch_size)
    return self:sub(1, batch_size)
 end
 
@@ -49,6 +50,7 @@ function DataSet:sub(batch, start, stop)
          stop = start
          start = batch
       end
+      self.log.trace('building batch with size ', self:nSample())
       return dp.Batch{
          which_set=self:whichSet(), 
          epoch_size=self:nSample(),
@@ -57,6 +59,7 @@ function DataSet:sub(batch, start, stop)
          -- why `and` here?
       }    
    end
+   self.log.trace('dataset: sub from ', start, ' to ', stop)
    assert(batch.isBatch, "Expecting dp.Batch at arg 1")
    self:inputs():sub(batch:inputs(), start, stop)
    if self:targets() then

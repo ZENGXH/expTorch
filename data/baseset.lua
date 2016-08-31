@@ -9,8 +9,7 @@ function BaseSet:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args = {}
    -- name, which_set, inputs, targets
-   dp.helper.unpack_config(args
-      {config},
+   dp.helper.unpack_config(args, {config},
       'BaseSet', 
       'Base class inherited by DataSet and Batch.',
       {arg='name', type='string', default=' ', help='name of the set'},
@@ -28,8 +27,14 @@ function BaseSet:__init(config)
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
    self:whichSet(args.which_set)
-   if args.inputs then self:inputs(args.inputs) end
-   if args.targets then self:targets(args.targets) end
+   if args.inputs then 
+       self.log.trace('get inputs when init')
+       self:inputs(args.inputs) 
+   end
+   if args.targets then 
+       self.log.trace('get targets when init')
+       self:targets(args.targets) 
+   end
 end
 
 function BaseSet:whichSet(which_set)
@@ -64,7 +69,7 @@ function BaseSet:inputs(inputs)
       self._inputs = inputs
    end
    self.log.tracefrom('request dataView: inputs')
-   if(not self._inputs) then self.log.trace('\t get nil') end
+   if(not self._inputs or self._inputs == nil ) then self.log.trace('\t get nil') end
    return self._inputs
 end
 

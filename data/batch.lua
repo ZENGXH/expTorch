@@ -12,8 +12,8 @@ function Batch:__init(config)
    if not config.name then config.name='batch' end
    parent.__init(self, config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args 
-   dp.helper.unpack(
+   local args = {} 
+   dp.helper.unpack_config(args,
       {config},
       'Batch', 
       'State of a mini-batch to be fed into a model and criterion.',
@@ -25,6 +25,7 @@ function Batch:__init(config)
 end
 
 function Batch:setup(config)
+   self.log.tracefrom('batch is setup in ')
    assert(type(config) == 'table', "Setup requires key-value arguments")
    local args
    args, self._batch_iter, self._batch_size, self._n_sample, 
