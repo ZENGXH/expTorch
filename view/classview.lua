@@ -6,9 +6,9 @@
 ------------------------------------------------------------------------
 local ClassView, parent = torch.class("dp.ClassView", "dp.DataView")
 ClassView.isClassView = true
-function ClassView:__init(name)
+function ClassView:__init(view, input, name)
     local name = name or 'ClassView'
-    parent.__init(self, name)
+    parent.__init(self, view, input, name)
 end
 
 

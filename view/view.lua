@@ -10,6 +10,7 @@ function View:__init(name)
    -- caches
    local name = name or 'view'
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log.trace('[init] view with name ', name)
    self.log.SetLoggerName(name)
    self._tensors = {}
    self._warn = false

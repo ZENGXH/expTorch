@@ -7,9 +7,12 @@
 local DataView, parent = torch.class("dp.DataView", "dp.View")
 DataView.isDataView = true
 
-function DataView:__init(view, input)
-   parent.__init(self, 'dataview')
+function DataView:__init(view, input, name)
+   local name = name or 'DataView'
+   parent.__init(self, name)
+   self.log.trace(name, ' view init with view ', view)
    if view and input then
+      self.log.trace('\t calling forward')
       self:forward(view, input)
    end
    self._module_graph = {}
@@ -34,12 +37,11 @@ end
 --          moduleTable = {modula, typeConversionTable}
 --  {['bchw'] = { nn.Identity(),{['torch.DoubleTensor'] = nn.Identity()}}}
 function DataView:forwardPut(view, input)
-   self.log.trace('[DataView] forwardPut view: ', view, ' with tensor size: ', dp.helper.PrintSize(input))
+   self.log.trace('[DataView] fw PUT view: ', view, ' with tensor size: ', dp.helper.PrintSize(input))
    -- store input for later use
    self._dim = #view -- eg #'bhwc' = 4
-   if input:dim() ~= self._dim then
-      error("view has more axes than input has dims", 3)
-   end
+   dp.helper.Asserteq(input:dim(), self._dim, "view has more axes than input has dims, get ")
+   
    if self._view and (view ~= self._view) then
       self._modules = nil
    end
@@ -510,6 +512,10 @@ function DataView:input(input)
       self._input = input
       return 
    end
+   self.log.tracefrom('requiring views input')
+   if(not self._input or self._input == nil) then
+       self.log.tracefrom('\t get empty')
+    end
    return self._input
 end
 
@@ -517,6 +523,8 @@ end
 function DataView:transpose(new_view)
    local view = _.split(self._view)
    local transpositions = {}
+   -- self.log.tracefrom('\t get empty')
+   -- self.log.trace('calling Transpose from '..self._view..' to '..new_view)
    for i=1, #new_view do
       local j = _.indexOf(view, new_view:sub(i,i))
       if i ~= j then

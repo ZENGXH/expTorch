@@ -4,9 +4,10 @@
 ------------------------------------------------------------------------
 local VideoView, parent = torch.class("dp.VideoView", "dp.DataView")
 VideoView.isVideoView = true
-function VideoView:__init(name)
+function VideoView:__init(view, input, name)
     local name = name or 'VideoView'
-    parent.__init(self, name)
+    local view = view or 'btchw'
+    parent.__init(self, view, input, name)
 end
 
 -- batch x height x width x channels/colors x time
@@ -64,8 +65,17 @@ function VideoView:bchw()
     return self:transpose('bchw')
 end
 
-function VideoView:tbchw()
-
+function VideoView:bctw()
+    if #self._view == 5 and self._view == 'btchw' then --btchw
+        -- w == h == 1, make c->h
+        if self.sampleSize(self:findAxis('t')) == 1 then
+            return nn.Select(self:findAxis('t'), 1)
+        elseif self:sampleSize(self:findAxis('h')) == 1 then
+            return nn.Select(self:findAxis('h'), 1)
+        end
+    else
+        error('i dont know what to do..')
+    end
 end
 
 -- for temporal convolution
