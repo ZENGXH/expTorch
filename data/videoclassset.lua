@@ -542,3 +542,86 @@ function VideoClassSet:sampleValid(dst, path)
     error('not implement')
 end
 
+function VideoClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
+   self.log.info('[sampleAsyncPut] with view in ', self._input_shape, ' for nSample ', nSample)
+   self._iter_mode = self._iter_mode or 'sample'
+   if (self._iter_mode ~= 'sample') then
+      error'can only use one Sampler per async ImageClassSet (for now)'
+   end  
+   
+   if not batch or batch == nil then
+      self.log.trace('batch is nil size of buffer_batches: ', self._buffer_batches:length() )
+      batch = (not self._buffer_batches:empty()) and self._buffer_batches:get() or self:batch(nSample)
+      self.log.trace('batch is now not nil')
+   else
+       self.log.trace('batch is nil')
+   end
+
+   local input = batch:inputs():input()
+   local target = batch:targets():input()
+   print(input:size(), input:dim())
+   assert(input:dim() == 5, 'get input dim: i')
+   assert(target)
+   
+   local p = torch.pointer(input:storage()) 
+   -- transfer the storage pointer over to a thread
+   local targetPointer = tonumber(ffi.cast('intptr_t', 
+        torch.pointer(target:storage())))
+ 
+   self.log.trace('get target pointer')
+   local inputPointer = tonumber(ffi.cast('intptr_t', 
+        torch.pointer(input:storage())))
+   self.log.trace('get input pointer')
+   input:cdata().storage = nil
+   target:cdata().storage = nil
+   
+   self._send_batches:put(batch)
+    
+   self.log.trace('put batch')
+   assert(self._threads:acceptsjob())
+   self.log.trace('start add job')
+   self._threads:addjob(
+      -- the job callback (runs in data-worker thread)
+      function()
+         -- set the transfered storage
+         
+         print('setStorage')
+         torch.setFloatStorage(input, inputPointer)
+         torch.setIntStorage(target, targetPointer)
+         local view =  'btchw'
+         
+         tbatch:inputs():forward(view, input)
+         tbatch:targets():forward('b', target)
+
+         print('forward')
+         
+         dataset:sample(tbatch, nSample, sampleFunc)
+         assert(tbatch:inputs():input()) 
+         assert(tbatch:targets():input()) 
+         -- transfer it back to the main thread
+         local istg = tonumber(ffi.cast('intptr_t', 
+            torch.pointer(input:storage())))
+         local tstg = tonumber(ffi.cast('intptr_t', 
+            torch.pointer(target:storage())))
+         input:cdata().storage = nil
+         target:cdata().storage = nil
+         return input, target, istg, tstg
+     
+      end,
+
+      -- the endcallback (runs in the main thread)
+      function(input, target, istg, tstg)
+          
+         local batch = self._send_batches:get()
+         torch.setFloatStorage(input, istg)
+         torch.setIntStorage(target, tstg)
+         batch:inputs():forward('btchw', input)
+         batch:targets():forward('b', target)
+         callback(batch)
+         batch:targets():setClasses(self._classes)
+         -- self.log.trace('putting to _recv_batches: ', #self._recv_batches)
+         self._recv_batches:put(batch)
+         
+      end
+   )
+end

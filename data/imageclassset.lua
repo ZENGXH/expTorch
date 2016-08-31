@@ -703,7 +703,7 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
 
    local input = batch:inputs():input()
    local target = batch:targets():input()
-   assert(input:dim() == 5, 'get input dim: ', input:dim())
+   assert(input:dim() == 4)
    assert(target)
    
    local p = torch.pointer(input:storage()) 
@@ -776,6 +776,5 @@ function ImageClassSet:asyncGet()
    if self._recv_batches:empty() then
       self._threads:dojob()
    end
-
    return self._recv_batches:get()
 end
