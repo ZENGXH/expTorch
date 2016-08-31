@@ -619,6 +619,7 @@ function ImageClassSet:multithread(nThread)
             print(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
          end
          dataset = dp[self._class_set](config)
+
          tbatch = dataset:batch(1)
       end
    )
@@ -702,7 +703,7 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
 
    local input = batch:inputs():input()
    local target = batch:targets():input()
-   assert(input)
+   assert(input:dim() == 5, 'get input dim: ', input:dim())
    assert(target)
    
    local p = torch.pointer(input:storage()) 
@@ -731,7 +732,7 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
          torch.setFloatStorage(input, inputPointer)
          torch.setIntStorage(target, targetPointer)
          local view =  'btchw'
-
+         
          tbatch:inputs():forward(view, input)
          tbatch:targets():forward('b', target)
 

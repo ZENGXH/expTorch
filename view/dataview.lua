@@ -40,7 +40,7 @@ function DataView:forwardPut(view, input)
    self.log.trace('[DataView] fw PUT view: ', view, ' with tensor size: ', dp.helper.PrintSize(input))
    -- store input for later use
    self._dim = #view -- eg #'bhwc' = 4
-   dp.helper.Asserteq(input:dim(), self._dim, "view has more axes than input has dims, get ")
+   dp.helper.Asserteq(input:dim(), self._dim, "view has more axes than input has dims, get view: "..view)
    
    if self._view and (view ~= self._view) then
       self._modules = nil
@@ -63,6 +63,7 @@ end
 -- This method could be called from multiple output Models
 -- return the tensor from the self._tensor by key'view' and key'tensor_type'
 function DataView:forwardGet(view, tensor_type)
+   
    self._got = true
    tensor_type = tensor_type or self._type
    -- retrieve a viewTable
