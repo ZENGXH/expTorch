@@ -9,12 +9,14 @@ Sampler.isSampler = true
 function Sampler:__init(config)
    config = config or {}
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, batch_size, epoch_size, ppf, gc_freq = xlua.unpack(
-      {config},
+   local args = {}
+   -- batch_size, epoch_size, ppf, gc_freq = xlua.unpack(
+   dp.helper.unpack_config(args,{config},
       'Sampler', 
       'Samples batches from a set of examples in a dataset. '..
       'Iteration ends after an epoch (sampler-dependent) ',
-
+      {arg='name', type='string', default='Sampler',
+       help='name of the sampler'},
       {arg='batch_size', type='number', default=128,
        help='Number of examples per sampled batches'},
 
@@ -28,24 +30,29 @@ function Sampler:__init(config)
       {arg='gc_freq', type='number', default=50,
        help='collectgarbage() every gc_freq batches'}
    )
-   self._ppf = ppf or function(batch) return batch end
-   self._gc_freq = gc_freq
-   self:setBatchSize(batch_size)
-   self._epoch_size = epoch_size
+   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log.SetLoggerName(args.name)
+   self._ppf = args.ppf or function(batch) return batch end
+   self._gc_freq = args.gc_freq
+   self:setBatchSize(args.batch_size)
+   self._epoch_size = args.epoch_size
    self._gc_n_batch = 0
-   if epoch_size > 0 then
-      if batch_size > epoch_size then
+   if args.epoch_size > 0 then
+      if args.batch_size > args.epoch_size then
          error("positive epoch_size should be greater than batch_size", 2)
       end
    else
       self._epoch_size = nil
    end
+   log.info('[Sampler init done]')
 end
 
 function Sampler:setup(config)
+   self.log.trace('Sampler setup')
    assert(type(config) == 'table', "Setup requires key-value arguments")
-   local args, batch_size, overwrite, mediator = xlua.unpack(
-      {config},
+   local args = {}
+   --batch_size, overwrite, mediator = xlua.unpack(
+   dp.helper.unpack_config(args,{config},
       'Sampler:setup', 
       'Samples batches from a set of examples in a dataset. '..
       'Iteration ends after an epoch (sampler-dependent) ',
@@ -59,15 +66,15 @@ function Sampler:setup(config)
       {arg='mediator', type='dp.Mediator',
        help='used for communication between objects'}
    )
-   if batch_size and (not self._batch_size or overwrite) then
-      self:setBatchSize(batch_size)
+   if args.batch_size and (not self._batch_size or args.overwrite) then
+      self:setBatchSize(args.batch_size)
    end
-   self._mediator = mediator
+   self._mediator = args.mediator
 end
 
 function Sampler:setBatchSize(batch_size)
    if torch.type(batch_size) ~= 'number' or batch_size < 1 then
-      error("Expecting positive batch_size")
+      error("Expecting positive batch_size get ", batch_size)
    end
    self._batch_size = batch_size
 end
@@ -80,7 +87,7 @@ function Sampler:report()
    return {batch_size = self._batch_size}
 end
 
---static function. Checks dataset type or gets dataset from datasource
+-- static function. Checks dataset type or gets dataset from datasource
 -- @param dataset, can be DataSource which contains a trainSet 
 --                  or dataView 
 -- convert all to dataSet format, the return
@@ -88,10 +95,13 @@ function Sampler.toDataset(dataset)
    if dataset.isDataSource then
       -- assumes dataset is the DataSource's training set
       dataset = dataset:trainSet()
-      self._warning = true
+      if self then
+        self._warning = true
+      end
    elseif dataset.isView then
       -- assumes dataset is a set of inputs in training set
-      dataset = dp.DataSet{which_set='train', inputs=dataset}
+      dataset = dp.DataSet{which_set='train', 
+        inputs=dataset}
    end
    assert(dataset.isDataSet, "Error : unsupported dataset type.")
    return dataset
@@ -112,13 +122,14 @@ end
 -- return an function object: an instance of sampler in Sampler class
 -- which has member function call by (batch)
 function Sampler:sampleEpoch(dataset)
-   dataset = dp.Sampler.toDataset(dataset)
+   dataset = dp.Sample.toDataset(dataset)
    local nSample = dataset:nSample()
    local epochSize = self._epoch_size or nSample
    self._start = self._start or 1 -- if self._start not set, default from 1
    local nSampled = 0
    local stop
-   -- build iterator
+   
+   --[[ build iterator ]]--
    -- function which can call as: sampler(batch)
    -- return batch, min(nSampled, epochSize), epochSize
    return function(batch)
@@ -131,25 +142,26 @@ function Sampler:sampleEpoch(dataset)
       -- in the function will call 
       -- Dataset:sub(1, 1 + stop - self._start), 
       -- i.e. the filling self.inputs[1, length] first
+      
+      --[[ get batch ]]--
       batch = batch or dataset:batch(stop - self._start + 1)
       -- inputs and targets
       -- batch in init already, calling sub will dill the data into batch._inputs and batch._targets
       dataset:sub(batch, self._start, stop)
-
-      local indices = batch:indices() or torch.Tensor()
-      
+      local indices = batch:indices() or torch.Tensor()      
       -- metadata
       batch:setup{
          batch_iter=stop, 
          batch_size=self._batch_size,
-         n_sample=stop-self._start+1, 
-         indices=indices:range(self._start, stop)
+         n_sample=stop - self._start + 1, 
+         indices=indices:range(self._start, stop) -- init indices in batch
       }
       -- data preprocesses, if no return batch 
       batch = self._ppf(batch)
       nSampled = nSampled + stop - self._start + 1
-      self._start = self._start + self._batch_size
 
+      --[[ increment self_start ]]--
+      self._start = self._start + self._batch_size
       if self._start >= nSample then
          self._start = 1
       end
@@ -169,7 +181,7 @@ function Sampler:sampleEpochAsync(dataset)
    local nSampledGet = 0
    local stop
      
-   -- build iterator
+   --[[ build iterator ]]--
    local sampleBatch = function(batch, putOnly)
       if nSampledGet >= epochSize then
          return
@@ -178,14 +190,14 @@ function Sampler:sampleEpochAsync(dataset)
       if nSampledPut < epochSize then
          stop = math.min(self._start+self._batch_size - 1, nSample)
          
+         --[[ get batch]]--
          -- up values
          local uvstop = stop
          local uvbatchsize = self._batch_size
          local uvstart = self._start
-
          -- ImageClassSet:subAsyncPut(batch, start, stop, callback)   
          dataset:subAsyncPut(batch, self._start, stop,
-            function(batch) 
+            function(batch) -- callback function 
                -- metadata
                batch:setup{
                    batch_iter=uvstop, 
@@ -195,6 +207,8 @@ function Sampler:sampleEpochAsync(dataset)
             end)
          
          nSampledPut = nSampledPut + stop - self._start + 1
+
+         --[[ increment self_start ]]--
          self._start = self._start + self._batch_size
          if self._start >= nSample then
             self._start = 1
@@ -208,10 +222,12 @@ function Sampler:sampleEpochAsync(dataset)
          return batch, math.min(nSampledGet, epochSize), epochSize
       end
    end
+
    assert(dataset.isAsync, "expecting asynchronous dataset")
    -- empty the async queue
    dataset:synchronize()
    -- fill task queue with some batch requests
+   -- the first time call sampleEpochAsync, start 'putOnly' sampleBatch for #nThread times
    for tidx=1, dataset.nThread do
       sampleBatch(nil, true)
    end

@@ -19,12 +19,14 @@ function RandomSampler:sampleEpoch(dataset)
       if nSampled >= epochSize then
          return
       end
+      -- init a batch
       batch = batch or dataset:sample(self._batch_size)
       -- inputs and targets
       dataset:sample(batch, self._batch_size)
       -- metadata
       batch:setup{
-         batch_iter=nSampled, batch_size=self._batch_size,
+         batch_iter=nSampled, 
+         batch_size=self._batch_size,
          n_sample=self._batch_size
       }
       batch = self._ppf(batch)
@@ -49,6 +51,7 @@ function RandomSampler:sampleEpochAsync(dataset)
      
    -- build iterator
    local sampleBatch = function(batch, putOnly)
+      self.log.trace('.. Get: ', nSampledGet, ' Put: ', nSampledPut, ' epochSize ', epochSize)
       if nSampledGet >= epochSize then
          return
       end
@@ -57,11 +60,18 @@ function RandomSampler:sampleEpochAsync(dataset)
          -- up values
          local uvbatchsize = self._batch_size
          local uvstart = self._start
+         if batch ~= nil then
+            self.log.trace('batch not nil')
+         else
+            self.log.trace('batch is nil')
+         end
+
          dataset:sampleAsyncPut(batch, self._batch_size, nil,
             function(batch) 
                local indices = batch:indices() or torch.Tensor()
                -- metadata
-               batch:setup{batch_iter=uvstop, batch_size=batch:nSample()}
+               batch:setup{batch_iter=uvstop, 
+                    batch_size=batch:nSample()}
                batch = self._ppf(batch)
             end)
          
@@ -73,6 +83,7 @@ function RandomSampler:sampleEpochAsync(dataset)
       end
       
       if not putOnly then
+         self.log.trace('not putOnly, call asyncGet')
          batch = dataset:asyncGet()
          nSampledGet = nSampledGet + self._batch_size
          self:collectgarbage() 
@@ -84,7 +95,8 @@ function RandomSampler:sampleEpochAsync(dataset)
    -- empty the async queue
    dataset:synchronize()
    -- fill task queue with some batch requests
-   for tidx=1,dataset.nThread do
+   for tidx=1, dataset.nThread do
+      log.trace('samplingBatch as thread: ', tidx)
       sampleBatch(nil, true)
    end
    

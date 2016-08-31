@@ -19,6 +19,7 @@ function ShuffleSampler:__init(config)
       {arg='random_seed', type='number', default=777,
        help='Used to initialize the shuffle generator.'}
    )
+   config.name = config.name or 'ShuffleSampler'
    self:randomSeed(random_seed)
    config.batch_size = batch_size
    parent.__init(self, config)
@@ -64,17 +65,21 @@ function ShuffleSampler:sampleEpoch(dataset)
       if nSampled >= epochSize then
          return
       end
-      stop = math.min(self._start+self._batch_size-1,nSample)
+      stop = math.min(self._start + self._batch_size - 1, nSample)
       batch = batch or dataset:batch(stop-self._start+1)
-      local batch_indices = dataset_indices:sub(self._start,stop)
+
+      local batch_indices = dataset_indices:sub(self._start, stop)
+      
       -- inputs and targets
       dataset:index(batch, batch_indices)
       local indices = batch:indices() or torch.Tensor()
+      
       -- metadata
       batch:setup{
-         batch_iter=stop, batch_size=self._batch_size,
-         n_sample=stop-self._start+1, 
-         indices=indices:range(self._start,stop)
+         batch_iter=stop, 
+         batch_size=self._batch_size,
+         n_sample=stop-self._start + 1, 
+         indices=indices:range(self._start, stop)
       }
       batch = self._ppf(batch)
       nSampled = nSampled + stop - self._start + 1
