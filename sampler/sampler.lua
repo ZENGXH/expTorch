@@ -5,6 +5,16 @@
 -- As a sampler, it need to know the batch_size
 -- one sampler can be used to sample from different dataset at the time, i.e.
 -- samper if independent from dataSet
+--
+-- difference between sampleEpoch and sampleEpochAsync
+-- knowing the start and end index of the data in the dataSet
+-- `sampleEpoch` will call `dataset:sub` to get the data and filled then into the
+-- batch in iterators
+--
+-- `sampleEpochAsync` will submit many jobs when it is first inited, 
+-- which are calling `dataset:subAsyncPut` 
+-- without putting data into the batch in the iterator
+-- TODO add fix_batch_size flags?
 ------------------------------------------------------------------------
 local Sampler = torch.class("dp.Sampler")
 Sampler.isSampler = true
@@ -146,7 +156,7 @@ end
 -- @return an function object: an instance of sampler in Sampler class
 --  which has member function call by (batch) and return batch, nSample, epochSize 
 -- useage:
---  local sampler = dp.Sampler:samplerEpoch(dataset)
+--  local sampler = dp.Sampler:sampleEpoch(dataset)
 --  local batch = sampler(batch) or batch = sampler()
 --
 -- the return function is used recycling in the training process
@@ -167,6 +177,9 @@ function Sampler:sampleEpoch(dataset)
       if nSampled >= epochSize then
          return
       end
+      -- i.e. the last batch may have batch_size less than self._batch_size
+      -- since that there.is not enough sample, which may be dangerous
+      -- TODO add fix_batch_size flags?
       stop = math.min(self._start + self._batch_size - 1, nSample)
       -- build up a batch given with batch_size, with [dataView]inputs and targets
       -- if batch is nil, will call batch_building with batch_size: step - self._start + 1, 
@@ -217,14 +230,17 @@ function Sampler:sampleEpochAsync(dataset)
    --[[ build iterator ]]--
    local sampleBatch = function(batch, putOnly)
       if nSampledGet >= epochSize then
-         return
+         -- do nothind is the Sampled Get intotal is enough for the epoch
+         -- i.e. reach the end of the current epoch
+         return 
       end
       -- recurrently put #epochSize sample
-      if nSampledPut < epochSize then
-         stop = math.min(self._start+self._batch_size - 1, nSample)
+      -- if nSampledPut < epochSize then -- renmoved, has been Checked
+      
+      stop = math.min(self._start + self._batch_size - 1, nSample)
          --[[ get batch]]--
          -- up values
-         local uvstop = stop
+         local uvstop = stop -- make it local 
          local uvbatchsize = self._batch_size
          local uvstart = self._start
          -- ImageClassSet:subAsyncPut(batch, start, stop, callback)   
@@ -245,7 +261,6 @@ function Sampler:sampleEpochAsync(dataset)
          if self._start >= nSample then
             self._start = 1
          end
-      end
       
       if not putOnly then
          batch = dataset:asyncGet()
