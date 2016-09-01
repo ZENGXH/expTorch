@@ -1,10 +1,23 @@
 ------------------------------------------------------------------------
 --[[ BaseSet ]]--
 -- Base class inherited by DataSet and Batch.
+-- @Method:
+-- 1. get and set the members
+-- 2. set IO_preprocess to inputsVIew and targetsVIew at the same time
 ------------------------------------------------------------------------
 local BaseSet = torch.class("dp.BaseSet")
 BaseSet.isBaseSet = true
 
+------------------------------------------------------------------------
+-- create a new BaseSet
+-- Use to manage inputsDataView & targetDataView for train/valid/test dataset
+-- can be imageDataSet ot VideoDataSet, work with classDataSet(GT)
+--
+-- @param condig: table: include
+--  [which_set: string = 'train']
+--  [inputs: View]
+--  [targets: View]
+------------------------------------------------------------------------
 function BaseSet:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args = {}
@@ -103,7 +116,7 @@ function BaseSet:preprocess(config)
           help='Allows measuring of statistics on the View ' .. 
           'of BaseSet to initialize the preprocess. Should normally ' .. 
           'only be done on the training set. Default is to fit the ' ..
-          'training set.'}
+          'training set.'} --? measuring of statistics?
    )
    assert(input_preprocess or target_preprocess, 
       "Error: no preprocess (neither input nor target) provided)")
@@ -133,7 +146,8 @@ function BaseSet:setTargets(targets)
 end
 
 function BaseSet:setWhichSet(which_set)
-   self._which_set = which_set
+            self._which_set = which_set
 end
 -- END DEPRECATED
 
+-- vim:ts=30 ss=30 sw=30 expandtab
