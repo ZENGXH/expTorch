@@ -7,11 +7,11 @@
 -- scale up to 14 million+ images)
 -- images on disk can have different height, width and number of channels.
 ------------------------------------------------------------------------
-local ImageClassSet, parent = torch.class("dp.ImageClassSet", "dp.DataSet")
-
+local ImageClassSet, parent = torch.class("dp.ImageClassSet", "dp.VisualDataSet")
 ImageClassSet._input_shape = 'bchw'
 ImageClassSet._output_shape = 'b'
 ImageClassSet.isImageClassSet = true
+
 function ImageClassSet:__init(config)
    parent.__init(self, config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
@@ -96,13 +96,7 @@ function ImageClassSet:saveIndex()
    torch.save(self._cache_path, index)
 end
 
-function ImageClassSet:loadIndex()
-   local index = torch.load(self._cache_path)
-   for k, v in pairs(index) do
-      self[k] = v
-   end
-   self._n_sample = self.imagePath:size(1)
-end
+-- function ImageClassSet:loadIndex()
 
 ------
 -- classIndices: table
@@ -157,9 +151,7 @@ function ImageClassSet:buildIndex()
    if self._verbose then
       print("found " .. #self._classes .. " classes")
    end
-   
    self._classIndices = classIndices
-   
    -- define command-line tools, try your best to maintain OSX compatibility
    local wc = 'wc'
    local cut = 'cut'
@@ -169,7 +161,6 @@ function ImageClassSet:buildIndex()
       cut = 'gcut'
       find = 'gfind'
    end
-   
    ---------------------------------------------------------------------
    -- Options for the GNU find command
    local extensionList = {'jpg', 'png','JPG','PNG','JPEG', 'ppm', 'PPM', 'bmp', 'BMP'}
@@ -272,7 +263,7 @@ function ImageClassSet:buildIndex()
          self.imageClass[{{runningIndex + 1, runningIndex + length}}]:fill(i)
       end
       runningIndex = runningIndex + length
-   end
+end
 
    ----------------------------------------------------------------------
    -- clean up temporary files
@@ -291,18 +282,36 @@ function ImageClassSet:buildIndex()
    os.execute('rm -f "' .. combinedFindList .. '"')
 end
 
+-------------------------------------------------------------
+-- create a batch with ImageViewInput and ClassViewTargets
+-- with vigen batchSize
+-- @param batch_size
+-- 
+-- @return dp.Batch
+-------------------------------------------------------------
+-- similar to BaseSet:CreateEmptyBatchIfNil, but init the data tensor of th
+-- e input and output view
+
 function ImageClassSet:batch(batch_size)
    self.log.tracefrom('request batch with size ', batch_size)
-   return dp.Batch{
-      which_set=self._which_set,
-      inputs=dp.ImageView('bchw', 
-        torch.FloatTensor(batch_size, unpack(self._sample_size))),
-      targets=dp.ClassView('b', 
-        torch.IntTensor(batch_size))
-   }
+   local batch = self:CreateEmptyBatchIfNil()
+   batch:SetView('input', dp.ImageView('bchw', 
+        torch.FloatTensor(batch_size, unpack(self._sample_size))))
+   batch:SetView('targets', dp.ClassView('b', 
+        torch.IntTensor(batch_size)))
+   return batch
 end
 
+-------------------------------------------------------------
 -- nSample(), nSample(class)
+-- return number of sample in the dataset
+--   or number of sample in some class required by className or classIndices
+-- @param class: string [optional]
+-- @param list:
+-- 
+-- @return sample number: Int
+-------------------------------------------------------------
+--[[overwrite]]--
 function ImageClassSet:nSample(class, list)
    list = list or self.classList
    if not class then
@@ -314,17 +323,23 @@ function ImageClassSet:nSample(class, list)
    end
 end
 
+-------------------------------------------------------------
+-- fill the batch with data from start to stop, 
+-- reuse the batch if given
+-- @param batch: dp.Batch [optional]
+-- @param start: int
+-- @param stop: int 
+--
+-- @return batch
+-------------------------------------------------------------
 function ImageClassSet:sub(batch, start, stop)
    if not stop then
       stop = start
       start = batch
       batch = nil
    end
-   -- inie a batch nil
-   batch = batch or dp.Batch{
-        which_set=self:whichSet(), 
-        epoch_size=self:nSample()
-        }
+   -- init a batch nil
+   batch = self:CreateEmptyBatchIfNil(batch)
    -- convert [string] self._sample_func to [function] sampleFunc
    local sampleFunc = self._sample_func
    if torch.type(sampleFunc) == 'string' then
@@ -368,12 +383,10 @@ function ImageClassSet:index(batch, indices)
    end
    batch = batch or dp.Batch{which_set=self:whichSet(), 
         epoch_size=self:nSample()}
-
    local sampleFunc = self._sample_func
    if torch.type(sampleFunc) == 'string' then
       sampleFunc = self[sampleFunc]
    end
-
    local inputTable = {}
    local targetTable = {}
    for i = 1, indices:size(1) do
@@ -444,9 +457,13 @@ function ImageClassSet:getImageBuffer(i)
    return self._imgBuffers[i]
 end
 
+
+---------------------------------------------------------
 -- Sample a class uniformly, and then uniformly samples example from class.
 -- This keeps the class distribution balanced.
--- sampleFunc is a function that generates one or many samples
+--
+-- @oaram batch: 
+-- @param sampleFunc: func, a function that generates one or many samples
 -- from one image. e.g. sampleDefault, sampleTrain, sampleTest.
 function ImageClassSet:sample(batch, nSample, sampleFunc)
    if (not batch) or (not sampleFunc) then 
@@ -455,7 +472,9 @@ function ImageClassSet:sample(batch, nSample, sampleFunc)
          nSample = batch
          batch = nil
       end
-      batch = batch or dp.Batch{which_set=self:whichSet(), epoch_size=self:nSample()}   
+      batch = batch or dp.Batch{
+                    which_set=self:whichSet(), 
+                    epoch_size=self:nSample()}   
    end
    
    sampleFunc = sampleFunc or self._sample_func

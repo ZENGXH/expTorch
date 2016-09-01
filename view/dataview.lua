@@ -11,6 +11,7 @@ function DataView:__init(view, input, name)
    local name = name or 'DataView'
    parent.__init(self, name)
    self.log.trace(name, ' view init with view ', view)
+   self._is_data_filled = false
    if view and input then
       self.log.trace('\t calling forward')
       self:forward(view, input)
@@ -19,12 +20,12 @@ function DataView:__init(view, input, name)
 end
 
 ---------------------- FORWARD -----------------------
-
 -- This method should be called by a maximum of one input Model.
 -- It is assumed that any input Tensor to forward is represented as
 -- the most expanded size of the orignal data. For example, an image
 -- batch would be forwarded with its 4 dimensions, and never with 
 -- collapses dimensions (2D). 
+--
 -- @para view string describe the input(tensor) dimension information
 -- @para input
 -- fill self._tensors table(inherit from dp.View)
@@ -36,8 +37,10 @@ end
 --      key: view(string) & value: moduleTable
 --          moduleTable = {modula, typeConversionTable}
 --  {['bchw'] = { nn.Identity(),{['torch.DoubleTensor'] = nn.Identity()}}}
+-----------------------------------------------------------------------
 function DataView:forwardPut(view, input)
-   self.log.trace('[DataView] fw PUT view: ', view, ' with tensor size: ', dp.helper.PrintSize(input))
+   self.log.trace('[DataView] fw PUT view: ', view, 
+      ' with tensor size: ', dp.helper.PrintSize(input))
    -- store input for later use
    self._dim = #view -- eg #'bhwc' = 4
    dp.helper.Asserteq(input:dim(), self._dim, "view has more axes than input has dims, get view: "..view)
@@ -45,8 +48,8 @@ function DataView:forwardPut(view, input)
    if self._view and (view ~= self._view) then
       self._modules = nil
    end
-   self._view = view
-   self._input = input
+   self:SetViewStr(view)
+   self:SetInputTensor(input)
    -- since this method is called only once at beginning of batch,
    -- we reinitialize gradOutputs and tensors cache:
    self._type = torch.typename(input)
@@ -63,7 +66,6 @@ end
 -- This method could be called from multiple output Models
 -- return the tensor from the self._tensor by key'view' and key'tensor_type'
 function DataView:forwardGet(view, tensor_type)
-   
    self._got = true
    tensor_type = tensor_type or self._type
    -- retrieve a viewTable
@@ -415,58 +417,54 @@ function DataView:flush()
    self._put = false
 end
 
--- When v is provided, reuse its data (a torch.Tensor).
+----------------------------------------------------
+--[[ filling view with data ]]--
+--
+-- When v is provided, reuse its data (a torch.Tensor)
+-----------------------------------------------------
+function DataView:CreateSubViewWithIndex(indices)
+   local data = self._input:index(b_pos, indices)
+    v = torch.protoClone(self, self._view, data)
+   return v
+end
+
+function DataView:FillSubViewWithIndex(v, indices)
+   if torch.type(v) ~= torch.type(self) then
+      error("Expecting "..torch.type(self).." at arg 1 "..
+            "got "..torch.type(v).." instead")
+   end  
+   local data = v:input()
+   data:index(self:input(), b_pos, indices)
+   assert(self._view == v._view, "Expecting arg 1 to have same view")
+   v:forward(self._view, data)
+   return v
+end
+
 function DataView:index(v, indices)
    local b_pos = self:findAxis('b')
    local data
    if indices and v then
-      if torch.type(v) ~= torch.type(self) then
-         error("Expecting "..torch.type(self).." at arg 1 "..
-               "got "..torch.type(v).." instead")
-      end
-      data = v:input()
-      data:index(self:input(), b_pos, indices)
-      assert(self._view == v._view, "Expecting arg 1 to have same view")
-      v:forward(self._view, data)
-      return v
+      return self:FillSubViewWithIndex(v, indices)
    end
    indices = indices or v
-   data = self._input:index(b_pos, indices)
-   v = torch.protoClone(self, self._view, data)
-   return v
+   return self:CreateSubViewWithIndex(indices)
 end
 
 -- Returns a sub-view narrowed on the batch dimension
 -- inplace returns a narrow window into self._input instead of a copy
 -- return a dataView which contain torch.Tensor data which is narrow from the original DataView
-function DataView:sub(v, start, stop, inplace)
-   local b_pos = self:findAxis('b')
-   local data
-   if v and stop then
-      -- given v and stop, check type v is the same with v; 
-      -- check v._view == self._view
-      if torch.type(v) ~= torch.type(self) then
-         error("Expecting "..torch.type(self).." at arg 1 "..
-               "got "..torch.type(v).." instead")
-      end
-      if v._view and self._view ~= v._view then
-         error("Expecting arg 1 to have same view")
-      end
-      data = v:input() or self:input().new()
-   else -- no v, i.e receive 3 or 2 arguments only
-      if v then -- the first arguments is indeed `start`
-         -- stop not given, only receive two arguments
-         inplace = stop
-         stop = start
-         start = v
-      end
-      -- create an object of DataView
-      v = torch.protoClone(self)
-      data = self:input().new()
+
+function DataView:FillSubViewWithSub(v, start, stop, inplace)
+   if torch.type(v) ~= torch.type(self) then
+      error("Expecting "..torch.type(self).." at arg 1 "..
+      "got "..torch.type(v).." instead")
    end
-   
+   if v._view and self._view ~= v._view then
+      error("Expecting arg 1 to have same view")
+   end
+   local b_pos = self:findAxis('b')
    local input = self._input:narrow(b_pos, start, stop-start + 1)
-   
+   local data = v:IsFilled() or self:input().new()
    if inplace then
       -- user beware: this doesn't interact well with :index()
       data:set(input) 
@@ -477,6 +475,29 @@ function DataView:sub(v, start, stop, inplace)
    -- filling the sub slice of data into v and return
    v:forward(self._view, data)
    return v
+end
+
+function DataView:CreateSubViewWithSub(start, stop, inplace)
+   local v = torch.protoClone(self)
+   return self:FillSubViewWithSub(v, start, stop, inplace)
+end
+
+function DataView:sub(v, start, stop, inplace)
+   local data
+   if v and stop then
+      -- given v and stop, check type v is the same with v; 
+      -- check v._view == self._view
+      return self:FillSubViewWithSub(v, start, stop, inplace)
+   else -- no v, i.e receive 3 or 2 arguments only
+      if v then -- the first arguments is indeed `start`
+         -- stop not given, only receive two arguments
+         inplace = stop
+         stop = start
+         start = v
+      end
+      -- create an object of DataView
+      return self:CreateSubViewWithIndex(start, stop, inplace)
+   end
 end
 
 -- optional : do sub inplace (no mem-copy), reuse returned dataview
@@ -508,18 +529,39 @@ function DataView:type(type)
    self:forwardPut(self._input:type(type))
 end
 
-function DataView:input(input)
-   if input then
-      self._input = input
-      return 
+
+-------------------------------------------------
+--[[ GET and Set tensor data ]]--
+-------------------------------------------------
+function DataView:IsFilled()
+   return self._is_data_filled
+end
+
+function DataView:GetInputTensor()
+   if self:IsFilled() then
+      return self._input
+   else
+      error('not filled yet')
    end
-   self.log.tracefrom('requiring views input')
-   if(not self._input or self._input == nil) then
-       self.log.tracefrom('\t get empty')
-    end
+end
+
+function DataView:SetInputTensor(input)
+   assert(torch.isTensor(input))
+   self._input = input
+   self._is_data_filled = true
    return self._input
 end
 
+function DataView:input(input)
+   if input then
+      self:SetInputTensor(input)
+      return 
+   end
+   self.log.tracefrom('requiring views input')
+   return self:GetInputTensor()
+end
+
+-----------------------------------------------
 -- a generic function for transposing views from self._view
 function DataView:transpose(new_view)
    local view = _.split(self._view)
@@ -537,3 +579,4 @@ function DataView:transpose(new_view)
    end
    return nn.Transpose(unpack(transpositions))
 end
+-- vim:ts=3 ss=3 sw=3 expandtab

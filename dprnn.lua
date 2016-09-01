@@ -95,6 +95,7 @@ dofile(paths.concat(dp.DPRNN_DIR, 'sampler/sampler.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'sampler/shufflesampler.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'sampler/sentencesampler.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'sampler/randomsampler.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'sampler/inordersampler.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'sampler/textsampler.lua'))
 
 --[[ preprocess ]]--

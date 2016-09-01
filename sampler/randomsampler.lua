@@ -5,7 +5,10 @@
 ------------------------------------------------------------------------
 local RandomSampler, parent = torch.class("dp.RandomSampler", "dp.Sampler")
 
---Returns an iterator over samples for one epoch
+-------------------------------------------------
+-- <overwrite>
+-- Returns an iterator over samples for one epoch
+-------------------------------------------------
 function RandomSampler:sampleEpoch(dataset)
    dataset = dp.RandomSampler.toDataset(dataset)
    local nSample = dataset:nSample()
@@ -22,7 +25,9 @@ function RandomSampler:sampleEpoch(dataset)
       -- init a batch
       batch = batch or dataset:sample(self._batch_size)
       -- inputs and targets
-      dataset:sample(batch, self._batch_size)
+      dataset:sample(batch, 
+                    self._batch_size,
+                    nil) -- sampleFunc
       -- metadata
       batch:setup{
          batch_iter=nSampled, 
@@ -30,6 +35,8 @@ function RandomSampler:sampleEpoch(dataset)
          n_sample=self._batch_size
       }
       batch = self._ppf(batch)
+      -- batch setup part in asyncGet
+
       nSampled = nSampled + self._batch_size
       self._start = self._start + self._batch_size
       if self._start >= nSample then
@@ -66,8 +73,9 @@ function RandomSampler:sampleEpochAsync(dataset)
             self.log.trace('batch is nil')
          end
 
-         dataset:sampleAsyncPut(batch, self._batch_size, nil,
-            function(batch) 
+         dataset:sampleAsyncPut(batch, self._batch_size, 
+            nil, -- used dataset:sampleFunc
+            function(batch) -- callback
                local indices = batch:indices() or torch.Tensor()
                -- metadata
                batch:setup{batch_iter=uvstop, 

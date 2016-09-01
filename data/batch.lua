@@ -20,7 +20,8 @@ Batch.isBatch = true
 function Batch:__init(config)
    if not config.name then config.name='batch' end
    parent.__init(self, config)
-   assert(type(config) == 'table', "Constructor requires key-value arguments")
+   assert(type(config) == 'table', 
+    "Constructor requires key-value arguments")
    local args = {} 
    dp.helper.unpack_config(args,{config},
       'Batch', 
@@ -29,11 +30,17 @@ function Batch:__init(config)
        help='number of samples in original dataset'}
    )
    self._epoch_size = args.epoch_size
+   self._indices = torch.Tensor()
    parent.__init(self, config)
 end
 
 ------------------------------------------------------------------------
--- setup Batch 
+-- setup/reset Batch's member:
+--  batch_iter,
+--  batch_size,
+--  n_sample
+--  indices
+--  epoch_size
 -- filling information of the Batch
 --
 -- @param condig: table: include

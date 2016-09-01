@@ -138,6 +138,11 @@ function View:view()
    return self._view or ''
 end
 
+function View:SetViewStr(view)
+    assert(torch.isTypeOf(view, 'string'))
+    self._view = view
+    return self._view
+end
 function View:flush()
    error"Not Implemented"
 end

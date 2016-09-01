@@ -1,6 +1,6 @@
 ------------------------------------------------------------------------
 --[[ Sampler ]]--
--- DataSet iterator
+-- DataSet iterator, abstract
 -- Sequentially samples batches from a dataset.
 -- As a sampler, it need to know the batch_size
 -- one sampler can be used to sample from different dataset at the time, i.e.
@@ -148,139 +148,16 @@ function Sampler:collectgarbage()
    end
 end
 
-------------------------------------------------------------------------
--- Build an `iterator` over samples for one epoch
--- Default is to iterate sequentially over all examples
---
--- @param dataset: dataSet which include inputDataView and outputDataView
--- @return an function object: an instance of sampler in Sampler class
---  which has member function call by (batch) and return batch, nSample, epochSize 
--- useage:
---  local sampler = dp.Sampler:sampleEpoch(dataset)
---  local batch = sampler(batch) or batch = sampler()
---
--- the return function is used recycling in the training process
-------------------------------------------------------------------------
+
 function Sampler:sampleEpoch(dataset)
-   dataset = dp.Sample.toDataset(dataset)
-   local nSample = dataset:nSample()
-   local epochSize = self._epoch_size or nSample
-   -- start index of the sample in dataset
-   self._start = self._start or 1 -- if self._start not set, default from 1
-   local nSampled = 0
-   local stop
-   
-   --[[ build iterator ]]--
-   -- function which can call as: sampler(batch)
-   -- return batch, min(nSampled, epochSize), epochSize
-   return function(batch)
-      if nSampled >= epochSize then
-         return
-      end
-      -- i.e. the last batch may have batch_size less than self._batch_size
-      -- since that there.is not enough sample, which may be dangerous
-      -- TODO add fix_batch_size flags?
-      stop = math.min(self._start + self._batch_size - 1, nSample)
-      -- build up a batch given with batch_size, with [dataView]inputs and targets
-      -- if batch is nil, will call batch_building with batch_size: step - self._start + 1, 
-      -- in the function will call 
-      -- Dataset:sub(1, 1 + stop - self._start), 
-      -- i.e. the filling self.inputs[1, length] first
-      
-      -- get batch, reused the batch, if not create one 
-      batch = batch or dataset:batch(stop - self._start + 1)
-
-      -- fill data, pass batch to dataset 
-      -- batch in init already, calling sub will fill the data into batch._inputs and batch._targets
-      dataset:sub(batch, self._start, stop)
-      
-      -- get empty indices, reuse indices tensor for resetting
-      -- metadata
-      batch:reset{
-         batch_iter = stop, -- number of examples seen so far 
-         batch_size = self._batch_size,
-         n_sample = stop - self._start + 1, 
-         indices = batch:indices():range(self._start, stop) -- indices of the samples of batch in dataset 
-      }
-      -- data preprocesses, if no return batch 
-      batch = self._ppf(batch)
-      nSampled = nSampled + stop - self._start + 1
-
-      --[[ increment self_start ]]--
-      self._start = self._start + self._batch_size
-      if self._start >= nSample then
-         self._start = 1
-      end
-      self:collectgarbage()
-      return batch, math.min(nSampled, epochSize), epochSize
-   end
+    self.log.fatal('DEPRECIATED without Implemented, Sampler is abstract, use InorderSampler instead')
+    return dp.InorderSampler.sampleEpoch(self, dataset)
 end
 
--- used with datasets that support asynchronous iterators like ImageClassSet
--- return a function object, call by(batch, putOnly)
 function Sampler:sampleEpochAsync(dataset)
-   dataset = dp.Sampler.toDataset(dataset)
-   local nSample = dataset:nSample()
-   local epochSize = self._epoch_size or nSample
-   self._start = self._start or 1
-   local nSampledPut = 0
-   local nSampledGet = 0
-   local stop
-     
-   --[[ build iterator ]]--
-   local sampleBatch = function(batch, putOnly)
-      if nSampledGet >= epochSize then
-         -- do nothind is the Sampled Get intotal is enough for the epoch
-         -- i.e. reach the end of the current epoch
-         return 
-      end
-      -- recurrently put #epochSize sample
-      -- if nSampledPut < epochSize then -- renmoved, has been Checked
-      
-      stop = math.min(self._start + self._batch_size - 1, nSample)
-         --[[ get batch]]--
-         -- up values
-         local uvstop = stop -- make it local 
-         local uvbatchsize = self._batch_size
-         local uvstart = self._start
-         -- ImageClassSet:subAsyncPut(batch, start, stop, callback)   
-         dataset:subAsyncPut(batch, self._start, stop,
-            function(batch) -- callback function 
-               -- metadata
-               batch:setup{
-                   batch_iter=uvstop, 
-                   batch_size=batch:nSample()
-               }
-               batch = self._ppf(batch)
-            end)
-         
-         nSampledPut = nSampledPut + stop - self._start + 1
-
-         --[[ increment self_start ]]--
-         self._start = self._start + self._batch_size
-         if self._start >= nSample then
-            self._start = 1
-         end
-      
-      if not putOnly then
-         batch = dataset:asyncGet()
-         nSampledGet = nSampledGet + self._batch_size
-         self:collectgarbage() 
-         return batch, math.min(nSampledGet, epochSize), epochSize
-      end
-   end
-
-   assert(dataset.isAsync, "expecting asynchronous dataset")
-   -- empty the async queue
-   dataset:synchronize()
-   -- fill task queue with some batch requests
-   -- the first time call sampleEpochAsync, start 'putOnly' sampleBatch for #nThread times
-   for tidx=1, dataset.nThread do
-      sampleBatch(nil, true)
-   end
-   return sampleBatch
+    self.log.fatal('DEPRECIATED without Implemented, Sampler is abstract, use InorderSampler instead')
+    return dp.InorderSampler.sampleEpochAsync(self, dataset)
 end
-
 -- change normal sampleEpoch to sampleEpochAsync
 function Sampler:async()
    self.sampleEpoch = self.sampleEpochAsync

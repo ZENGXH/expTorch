@@ -44,17 +44,17 @@ function DataSource:__init(config)
        'preprocess the valid_set and test_set.'}  
    )
    local name = args.name
-   local train_set = args.train_set
-   local valid_set = args.valid_set
-   local test_set = args.test_set
+   -- set dataset if given
+   for attribute in pairs({'train', 'valid', 'test'}) do
+       if args[attribute..'_set'] then
+           self.SetAttributeSet(args[attribute..'_set'], attribute)
+        end
+   end
+
    local input_preprocess = args.input_preprocess
    local target_preprocess = args.target_preprocess
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(name)
-   --datasets
-   self:SetOrGetAttributeSet(train_set, 'train')
-   self:SetOrGetAttributeSet(valid_set, 'valid')
-   self:SetOrGetAttributeSet(test_set, 'test')
    --preprocessing
    self:inputPreprocess(input_preprocess)
    self:targetPreprocess(target_preprocess)
@@ -175,25 +175,31 @@ end
 -- @return [attributes]_set
 ------------------------------------------------------------------------
 function DataSource:SetOrGetAttributeSet(data_set, attribute)
-    assert(attribute == 'train' or attribute == 'valid' or attribute == 'test')
-   if data_set then
+   assert(attribute == 'train' or attribute == 'valid' or attribute == 'test', 'invalid attribute argument '..attribute)
+   if data_set then -- set
        self.log.trace('[ds] set data_set '..attribute)
-       self:SetAttributeSet(data_set, attribute)
-   end
+       return self:SetAttributeSet(data_set, attribute)
+   end -- if data_set
+   -- get
    self.log.trace('[ds] request data_set '..attribute)
-   return self:GetAttributeSet(attribute)
+   if self['_has_'..attribute..'_set'] then
+       return self:GetAttributeSet(attribute)
+   else
+       self.log.error(attribute..' set is not setted')
+       return nil
+   end -- if self._has_[attribute]_set 
 end
 
 function DataSource:trainSet(train_set)
-   self:SetOrGetAttributeSet(train_set, 'train_set')
+   return self:SetOrGetAttributeSet(train_set, 'train')
 end
 
 function DataSource:validSet(valid_set)
-   self:SetOrGetAttributeSet(valid_set, 'valid_set')
+   return self:SetOrGetAttributeSet(valid_set, 'valid')
 end
 
 function DataSource:testSet(test_set)
-   self:SetOrGetAttributeSet(test_set, 'test_set')
+   return self:SetOrGetAttributeSet(test_set, 'test')
 end
 
 ------------------------------------------------------------------------
@@ -203,7 +209,8 @@ end
 function DataSource:GetAttributeSet(attribute)
     assert(attribute == 'train' or attribute == 'valid' or attribute == 'test')
     local data_set = self['_'..attribute..'_set']
-    assert(data_set.isDataSet)
+    self.log.tracefromfrom('requiring attributes from ')
+    assert(data_set and data_set.isDataSet, 'empty return '..attribute)
     return data_set
 end
 
@@ -225,16 +232,18 @@ function DataSource:SetAttributeSet(data_set, attribute)
     assert(data_set.isDataSet)
     assert(attribute == 'train' or attribute == 'valid' or attribute == 'test')
     self['_'..attribute..'_set'] = data_set
+    self['_has_'..attribute..'_set'] = true
+    return data_set
 end
 
 function DataSource:SetTrainSet(train_set)
-   self:SetAttributeSet(train_set, 'train')
+   return self:SetAttributeSet(train_set, 'train')
 end
 function DataSource:SetValidSet(valid_set)
-   self:SetAttributeSet(valid_set, 'valid')
+   return self:SetAttributeSet(valid_set, 'valid')
 end
 function DataSource:SetTestSet(test_set)
-   self:SetAttributeSet(test_set, 'test')
+   return self:SetAttributeSet(test_set, 'test')
 end
 
 function DataSource:inputPreprocess(input_preprocess)

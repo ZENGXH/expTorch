@@ -45,11 +45,69 @@ end
 -- reuses the inputs and targets (so don't modify them)
 -- @return Batch instances with batch_size
 ------------------------------------------------------------------------
-function DataSet:batch(batch_size)
-   self.log.trace('calling batch with batch_size: ', batch_size)
-   return self:sub(1, batch_size)
+function DataSet:CreateEmptyBatchIfNil(batch)
+     if batch then return batch end
+     return dp.Batch{
+        which_set=self:whichSet(), 
+        epoch_size=self:nSample()
+    }
 end
 
+function DataSet:CreateBatchWithSize(batch_size)
+    assert(batch_size > 0)
+    local batch = self:CreateEmptyBatchIfNil()
+    return self:FillBatchWithSize(batch, batch_size)
+end
+
+function DataSet:CreateBatchWithSub(start, stop)
+    assert(start > 0 and stop > start)
+    local batch = self:CreateEmptyBatchIfNil()
+    return self:FillBatchWithSub(batch, start, stop)
+end
+
+function DataSet:CreateBatchWithindex(indices)
+    assert(torch.isTensor(indices))
+    local batch = self:CreateEmptyBatchIfNil()
+    return self:FillBatchWithIndex(batch, indices)
+end
+
+function DataSet:FillBatchWithSize(batch, batch_size)
+    assert(batch.isBatch)
+    batch:SetView('input', self:inputs():sub(1, batch_size))
+    if self:targets() then
+        batch:SetView('target', self:targets():sub(1, batch_size))
+    end
+    return batch
+end
+
+function DataSet:FillBatchWithSub(batch, start, stop)
+    assert(batch.isBatch, "Expecting dp.Batch at arg 1")
+    assert(batch:IsFilled())
+    batch:SetView('input', 
+            self:GetView('input'):CreateSubViewWithSub(start, stop))
+    if self:targets() then
+        batch:SetView('target', 
+            self:GetView('target'):CreateSubViewWithSub(start, stop))
+    end
+    return batch  
+end
+
+function DataSet:FillBatchWithIndex(batch, indices)
+    assert(batch.isBatch, "Expecting dp.Batch at arg 1")
+    assert(batch:IsFilled())
+    batch:SetView('input', 
+            self:GetView('input'):CreateBatchWithIndex(indices))
+    if self:targets() then
+        batch:SetView('target', 
+            self:GetView('target'):CreateBatchWithIndex(indices))
+    end
+    return batch  
+end
+
+function DataSet:batch(batch_size)
+   self.log.trace('calling batch with batch_size: ', batch_size)
+   return self:CreateBatchWithSize(batch_size)
+end
 ---------------------------------------------------------------------------
 -- reuses the inputs and targets (so don't modify them)
 -- given 1 and batch_size: builds a batch with inputsView and outputView in
@@ -60,6 +118,7 @@ end
 -- @param batch_size: int, size of the batch
 -- @return Batch instances with batch_size, dataView filled or unfilled
 ---------------------------------------------------------------------------
+
 function DataSet:sub(batch, start, stop)
    if (not batch) or (not stop) then 
       -- batch not given or stop not given
@@ -70,21 +129,10 @@ function DataSet:sub(batch, start, stop)
       end
       self.log.trace('building batch with size ', self:nSample())
       -- get a DataView Contains sub_data from start to stop of the orignal inputs
-      return dp.Batch{
-         which_set=self:whichSet(), 
-         epoch_size=self:nSample(),
-         inputs=self:inputs():sub(start, stop), 
-         targets=self:targets() and self:targets():sub(start, stop)
-      }   
-   end
-
+      return self:CreateBatchWithSub(start, stop)
+  end
    self.log.trace('dataset: sub from ', start, ' to ', stop)
-   assert(batch.isBatch, "Expecting dp.Batch at arg 1")
-   self:inputs():sub(batch:inputs(), start, stop)
-   if self:targets() then
-      self:targets():sub(batch:targets(), start, stop)
-   end
-   return batch  
+   return self:FillBatchWithSub(batch, start, stop)
 end
 
 ---------------------------------------------------------------------------
@@ -102,17 +150,9 @@ end
 function DataSet:index(batch, indices)
    if (not batch) or (not indices) then 
       indices = indices or batch
-      return dp.Batch{
-         which_set=self:whichSet(), 
-         epoch_size=self:nSample(),
-         inputs=self:inputs():index(indices),
-         targets=self:targets() and self:targets():index(indices)
-      }
+      return self:CreateBatchWithIndex(indices) 
    end
-   assert(batch.isBatch, "Expecting dp.Batch at arg 1")
-   self:inputs():index(batch:inputs(), indices)
-   if self:targets() then
-      self:targets():index(batch:targets(), indices)
-   end
-   return batch
+
+   return self:FillBatchWithIndex(batch, indices)
+
 end

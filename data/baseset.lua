@@ -4,6 +4,8 @@
 -- @Method:
 -- 1. get and set the members
 -- 2. set IO_preprocess to inputsVIew and targetsVIew at the same time
+-- both dataset and batch have inputView and targetView, and Preprocesses
+-- 
 ------------------------------------------------------------------------
 local BaseSet = torch.class("dp.BaseSet")
 BaseSet.isBaseSet = true
@@ -19,6 +21,7 @@ BaseSet.isBaseSet = true
 --  [targets: View]
 ------------------------------------------------------------------------
 function BaseSet:__init(config)
+   self._has_input_view = false
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args = {}
    -- name, which_set, inputs, targets
@@ -26,7 +29,8 @@ function BaseSet:__init(config)
       'BaseSet', 
       'Base class inherited by DataSet and Batch.',
       {arg='name', type='string', default=' ', help='name of the set'},
-      {arg='which_set', type='string', help='"train", "valid" or "test" set'},
+      {arg='which_set', type='string', req=true,
+      help='"train", "valid" or "test" set'},
       {arg='inputs', type='dp.View | table of dp.Views', 
        help='Sample inputs to a model. These can be Views or '..
        'a table of Views (in which case these are converted '..
@@ -40,13 +44,14 @@ function BaseSet:__init(config)
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
    self:whichSet(args.which_set)
+   self._has_target_view = false
    if args.inputs then 
        self.log.trace('get inputs when init')
-       self:inputs(args.inputs) 
+       self:SetView('inputs', args.inputs)
    end
    if args.targets then 
        self.log.trace('get targets when init')
-       self:targets(args.targets) 
+       self:SetView('targets', args.targets)
    end
 end
 
@@ -73,32 +78,75 @@ function BaseSet:nSample()
       return 0
    end
 end
+----------------------------------------------------
+-- get/set input/target dp.View
+-- @param attribute: string, input or target
+-- 
+-----------------------------------------------------
+function BaseSet:GetView(attribute)
+   if attribute == 'inputs' or attribute == 'input' then
+      if not self._has_input_view then 
+         self.log.tracefrom('\t get nil') 
+         return nil
+      else
+         return self._inputs
+      end
+   elseif attribute == 'target' or attribute == 'targets' then
+      if not self._has_target_view then 
+         self.log.tracefrom('\t get nil') 
+         return nil
+      else
+         return self._targets
+      end
+  else
+     error('invalid attribute')
+  end
+end
 
--- get/set input dp.View
+function BaseSet:SetView(attribute, dataview)
+   assert(dataview.isView, "Error : invalid inputs. Expecting type dp.View")
+   if attribute == 'inputs' or attribute == 'input' then
+      self._inputs = dataview 
+      self._has_input_view = true
+      return self._inputs
+   elseif attribute == 'target' or attribute == 'targets' then
+      self._targets = dataview
+      self._has_target_view = true
+      return self._targets
+  else
+     error('invalid attribute')
+  end
+end
+
+function BaseSet:IsFilled()
+   return self._has_input_view
+end
+-- become DEPRECATED
 function BaseSet:inputs(inputs)
    if inputs then
       self.log.tracefrom('set dataView: inputs')
-      assert(inputs.isView, "Error : invalid inputs. Expecting type dp.View")
-      self._inputs = inputs
+      return self:SetView('input', inputs)
+   else
+      self.log.tracefrom('request dataView: inputs')
+      return self:GetView('input')
    end
-   self.log.tracefrom('request dataView: inputs')
-   if(not self._inputs or self._inputs == nil ) then self.log.trace('\t get nil') end
-   return self._inputs
 end
 
 -- get/set target dp.View
 function BaseSet:targets(targets)
    if targets then
-      self.log.trace('set dataView: targets')
-      assert(targets.isView, "Error : invalid targets. Expecting type dp.View")
-      self._targets = targets
+      self.log.tracefrom('set dataView: targets')
+      return self:SetView('target', targets)
    end
-   self.log.trace('request dataView: targets')
-   if(not self._targets) then self.log.trace('\t get nil') end
-   return self._targets
+   self.log.tracefrom('request dataView: targets')
+   return self:GetView('target')
 end
 
+----------------------------------------------------
 -- Preprocesses are applied to Views
+-- @param config
+--
+---------------------------------------------------
 function BaseSet:preprocess(config)
    config = config or {}
    assert(torch.type(config) == 'table' and not config[1], 
@@ -141,13 +189,13 @@ end
 
 function BaseSet:setTargets(targets)
    assert(targets.isView,
-      "Error : invalid targets. Expecting type dp.View")
+   "Error : invalid targets. Expecting type dp.View")
    self._targets = targets
 end
 
 function BaseSet:setWhichSet(which_set)
-            self._which_set = which_set
+   self._which_set = which_set
 end
 -- END DEPRECATED
 
--- vim:ts=30 ss=30 sw=30 expandtab
+-- vim:ts=3 ss=3 sw=3 expandtab

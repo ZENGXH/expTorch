@@ -12,7 +12,7 @@ local log = { _version = "0.1.0" }
 
 log.usecolor = true
 log.outfile = log.outfile or paths.concat(os.getenv('PWD'), 'log')
-log.level = "info"
+log.level = "trace"
 log.name = " " 
 
 function log.SetLoggerName(name)
@@ -23,6 +23,7 @@ end
 local modes = {
     { name = "trace", color = "\27[34m", },
     { name = "tracefrom", color = "\27[34m"},
+    { name = "tracefromfrom", color = "\27[34m"},
     { name = "debug", color = "\27[36m", },
     { name = "write", color = "\27[32m", },
     { name = "info",  color = "\27[32m", },
@@ -142,7 +143,10 @@ for i, x in ipairs(modes) do
         end   
         if x.name == "tracefrom" then
             msg = msg..'---'..lineinfo_up
+        elseif x.name == 'tracefromfrom' then
+            msg = msg .. '\n---'..lineinfo_up ..'\n---'.."(("..debug.getinfo(4, "Sl").short_src .. ":" .. debug.getinfo(4, "Sl").currentline.."))"
         end
+        
 
         print(string.format("%s[%-6s%s]%s %s:{%s} %s",
         log.usecolor and x.color or "",

@@ -6,16 +6,18 @@
 -- video on disk can have different length.
 -- video can be reach by reading the whole video ot frames bin
 -- currently not modify for frames-level-raw-video-frames input
+--
+-- data is filled when: sampleTrain or sampleTest is called with path
 ------------------------------------------------------------------------
 
-local VideoClassSet, parent = torch.class("dp.VideoClassSet", "dp.ImageClassSet")
+local VideoClassSet, parent = torch.class("dp.VideoClassSet", "dp.VisualDataSet")
+
 -- batch, timeStep, channels, height, width
 VideoClassSet._input_shape = 'btchw' 
 VideoClassSet._output_shape = 'b'
 VideoClassSet.isVieoClassSet = true
-VideoClassSet.isImageClassSet = true
 function VideoClassSet:__init(config)
-
+    parent.__init(self, config)
     assert(type(config) == 'table', "Constructor requires key-value arguments")
     local args = {} 
     dp.helper.unpack_config(args,
@@ -147,14 +149,17 @@ function VideoClassSet:loadIndex()
         self[k] = v
     end
     self._n_sample = #self.videoPath
-    self.log.info('load index from '..self._cache_path..' done. get _n_sample ', self._n_sample)
-
-    self.log.info(string.format('\t loadIndex checking #classList %d, #_classes %d, #_classIndices %d,'..
-            ' #classListVideo %d, #classListVideoIndices %d, #classListFrameIndices %d, '..
-            ' #videoList %d, #videoIndices %d, #videoLength %d, #videoPath %d', 
-            #self.classList, #self._classes, #self._classIndices,
-            #self.classListVideo, #self.classListVideoIndices, #self.classListFrameIndices,
-            #self.videoList, #self.videoIndices, #self.videoLength, #self.videoPath))
+    self.log.info('load index from '..self._cache_path..
+        ' done. get _n_sample ', self._n_sample)
+    self.log.info(string.format('\t loadIndex checking #classList %d, '..
+        '#_classes %d, #_classIndices %d,'..
+        ' #classListVideo %d, #classListVideoIndices %d, '..
+        '#classListFrameIndices %d, '..
+        ' #videoList %d, #videoIndices %d, #videoLength %d, #videoPath %d', 
+         #self.classList, #self._classes, #self._classIndices,
+         #self.classListVideo, #self.classListVideoIndices, 
+         #self.classListFrameIndices, #self.videoList, 
+         #self.videoIndices, #self.videoLength, #self.videoPath))
 end
 
 ----
@@ -253,15 +258,27 @@ function VideoClassSet:buildIndex()
     self.log.info(string.format('[VideoClassSet] buildIndex done, get #samples %d, #video %d, #frames %d intotal', self._n_sample, self._n_video, self._n_frame))
 end
 
+
+-------------------------------------------------------------
+-- create a batch with VideoViewInput and ClassViewTargets
+-- with vigen batchSize
+-- @param batch_size
+-- 
+-- @return dp.Batch
+-------------------------------------------------------------
+
 function VideoClassSet:batch(batch_size)
-   self.log.tracefrom('request batch with size ', batch_size, ' sample_size(input) ', unpack(self._sample_size))
-    return dp.Batch{
-        which_set=self._which_set,
-        inputs=dp.VideoView(self._input_shape, 
-            torch.FloatTensor(batch_size, self.frames_per_select, unpack(self._sample_size))),
-        targets=dp.ClassView(self._output_shape, 
-            torch.IntTensor(batch_size))
-    }
+    return CreateBatch(batch_size)
+end
+
+function VideoClassSet:CreateBatch(batch_size)
+   self.log.tracefrom('request batch with size ', batch_size, 
+        ' sample_size(input) ', unpack(self._sample_size))
+   local batch = self:CreateEmptyBatchIfNil()
+   batch:SetView('input', dp.VideoView(self._input_shape, 
+        torch.FloatTensor(batch_size, self.frames_per_select, unpack(self._sample_size))))
+   batch:SetView('targets', dp.ClassView(self._output_shape, torch.IntTensor(batch_size)))
+   return batch
 end
 
 -- nSample(), nSample(class)
@@ -422,40 +439,45 @@ end
 -- from one image. e.g. sampleDefault, sampleTrain, sampleTest.
 function VideoClassSet:sample(batch, nSample, sampleFunc)
     self.log.trace('VideoClassSet sampling ')
-    if (not batch) or (not sampleFunc) then 
-        if torch.type(batch) == 'number' then
-            sampleFunc = nSample
-            nSample = batch
-            batch = nil
-        end
-        batch = batch or dp.Batch{which_set=self:whichSet(), 
-                epoch_size=self:nSample()}   
+    -- receive 1 or 2 arguments
+    if not sampleFunc and torch.type(batch) == 'number' then
+        sampleFunc = nSample
+        nSample = batch
+        batch = nil
     end
 
-    sampleFunc = sampleFunc or self._sample_func
+    local batch = self:CreateEmptyBatchIfNil(batch)
+
+    local sampleFunc = sampleFunc or self._sample_func
     if torch.type(sampleFunc) == 'string' then
         sampleFunc = self[sampleFunc]
     end
-
-    nSample = nSample or 1
+    local nSample = nSample or 1
     self.log.trace('\t nSample =', nSample)
+    
     local inputTable = {}
     local targetTable = {}   
+    
     for i=1, nSample do
         -- sample class(label)
         local index_class = torch.random(1, #self._classes)
-        self.log.trace('select index_class ', index_class, ' has video: ', #self.classListVideo[index_class])
+        self.log.trace('select index_class ', index_class, 
+            ' has video: ', #self.classListVideo[index_class])
         -- sample video from class
-        local index_in_class = torch.random(1, #self.classListVideo[index_class])
-        local index_video = self.classListVideoIndices[index_class][index_in_class]
-        self.log.trace('select index_in_class ', index_in_class, ' index_video: ', index_video)
+        local index_in_class = torch.random(1, 
+            #self.classListVideo[index_class])
+        local index_video = self.classListVideoIndices[
+            index_class][index_in_class]
+        self.log.trace('select index_in_class ', index_in_class, 
+            ' index_video: ', index_video)
         -- local videoPath = ffi.string(torch.data(torch.CharTensor({self.videoPath[self.classListVideoIndices[index_class][index_in_class]]})))
         
         local videoPath = self.videoPath[index_video]
-
         self.log.trace('get videopath: ', videoPath)
+
         local dst = self:getImageBuffer(i)
         dst = sampleFunc(self, dst, videoPath) -- enlarge size from 4d to 5d
+        
         table.insert(inputTable, dst)
         table.insert(targetTable, index_class)  
     end
@@ -466,11 +488,12 @@ function VideoClassSet:sample(batch, nSample, sampleFunc)
     local targetTensor = targetView:input() or torch.IntTensor()
 
     inputTensor, targetTensor = self:tableToTensor(inputTable, targetTable, inputTensor, targetTensor)
-
     -- assert(inputTensor:size(2) == 3)
     assert(inputTensor:size(1) == #inputTable)
     assert(targetTensor:size(1) == #targetTable)
     self.log.trace('tableToTensor return: size ', dp.helper.PrintSize(inputTensor))
+
+    batch:SetView('input', dp.VideoView
     assert(inputView.isView)
     self.log.trace('calling dataview forward')
     inputView:forward('btchw', inputTensor)
@@ -559,9 +582,9 @@ function VideoClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
 
    local input = batch:inputs():input()
    local target = batch:targets():input()
-   print(input:size(), input:dim())
-   assert(input:dim() == 5, 'get input dim: i')
-   assert(target)
+   -- print(input:size(), input:dim())
+   -- assert(input:dim() == 5, 'get input dim:')
+   -- assert(target)
    
    local p = torch.pointer(input:storage()) 
    -- transfer the storage pointer over to a thread
@@ -584,17 +607,14 @@ function VideoClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
       -- the job callback (runs in data-worker thread)
       function()
          -- set the transfered storage
-         
          print('setStorage')
          torch.setFloatStorage(input, inputPointer)
          torch.setIntStorage(target, targetPointer)
          local view =  'btchw'
-         
          tbatch:inputs():forward(view, input)
          tbatch:targets():forward('b', target)
-
          print('forward')
-         
+         -- fill tbatch wilth inputData and targetData         
          dataset:sample(tbatch, nSample, sampleFunc)
          assert(tbatch:inputs():input()) 
          assert(tbatch:targets():input()) 
@@ -606,22 +626,20 @@ function VideoClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
          input:cdata().storage = nil
          target:cdata().storage = nil
          return input, target, istg, tstg
-     
       end,
 
       -- the endcallback (runs in the main thread)
       function(input, target, istg, tstg)
-          
          local batch = self._send_batches:get()
          torch.setFloatStorage(input, istg)
          torch.setIntStorage(target, tstg)
          batch:inputs():forward('btchw', input)
          batch:targets():forward('b', target)
-         callback(batch)
+         callback(batch) 
+         --callback: setup batch and run sampler's ppf on batch, view may be changed
          batch:targets():setClasses(self._classes)
          -- self.log.trace('putting to _recv_batches: ', #self._recv_batches)
          self._recv_batches:put(batch)
-         
       end
    )
 end
