@@ -141,12 +141,15 @@ end
 ------------------------------------------------------------------------
 -- Build an `iterator` over samples for one epoch
 -- Default is to iterate sequentially over all examples
+--
 -- @param dataset: dataSet which include inputDataView and outputDataView
 -- @return an function object: an instance of sampler in Sampler class
 --  which has member function call by (batch) and return batch, nSample, epochSize 
 -- useage:
 --  local sampler = dp.Sampler:samplerEpoch(dataset)
 --  local batch = sampler(batch) or batch = sampler()
+--
+-- the return function is used recycling in the training process
 ------------------------------------------------------------------------
 function Sampler:sampleEpoch(dataset)
    dataset = dp.Sample.toDataset(dataset)
@@ -171,20 +174,21 @@ function Sampler:sampleEpoch(dataset)
       -- Dataset:sub(1, 1 + stop - self._start), 
       -- i.e. the filling self.inputs[1, length] first
       
-      --[[ get batch ]]--
+      -- get batch, reused the batch, if not create one 
       batch = batch or dataset:batch(stop - self._start + 1)
-      -- inputs and targets
-      -- batch in init already, calling sub will dill the data into batch._inputs and batch._targets
+
+      -- fill data, pass batch to dataset 
+      -- batch in init already, calling sub will fill the data into batch._inputs and batch._targets
       dataset:sub(batch, self._start, stop)
-      local indices = batch:indices() or torch.Tensor()      
+      
+      -- get empty indices, reuse indices tensor for resetting
       -- metadata
       batch:reset{
-         batch_iter=stop, -- number of examples seen so far 
-         batch_size=self._batch_size,
-         n_sample=stop - self._start + 1, 
-         indices=indices:range(self._start, stop) -- indices of the samples of batch in dataset 
-         }
-
+         batch_iter = stop, -- number of examples seen so far 
+         batch_size = self._batch_size,
+         n_sample = stop - self._start + 1, 
+         indices = batch:indices():range(self._start, stop) -- indices of the samples of batch in dataset 
+      }
       -- data preprocesses, if no return batch 
       batch = self._ppf(batch)
       nSampled = nSampled + stop - self._start + 1
