@@ -4,9 +4,9 @@
 -- Used to generate up to 3 DataSets : train, valid and test.
 -- Can also perform preprocessing using Preprocess on all DataSets by
 -- fitting only the training set.
--- core of DataSource is [DataSet] trainSet, testSet, validSet | [preprocess] inputPreprocess and targetPreprocess
--- -- core of BaseSets(DataSet, Batch) is [DataView] inputs, targets
--- -- -- core of dataView(ImageVIew, ClassView, ListView...) is [which_set] like string 'train' & [data] torch.Tensor which is filled by calling `forward`
+-- com of DataSource is [DataSet] trainSet, testSet, validSet | [preprocess] inputPreprocess and targetPreprocess
+-- -- com of BaseSets(DataSet, Batch) is [DataView] inputs, targets
+-- -- -- com of dataView(ImageVIew, ClassView, ListView...) is [which_set] like string 'train' & [data] torch.Tensor which is filled by calling `forward`
 --
 ------------------------------------------------------------------------
 local DataSource = torch.class("dp.DataSource")
@@ -14,10 +14,8 @@ DataSource.isDataSource = true
 
 function DataSource:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, name, train_set, valid_set, test_set, 
-         input_preprocess, target_preprocess
-      = xlua.unpack(
-      {config},
+   local args = {}
+   dp.helper.unpack_config(args, {config},
       'DataSource', 
       'Abstract Class ' ..
       'Used to generate up to 3 DataSets : train, valid and test. ' ..
@@ -45,27 +43,36 @@ function DataSource:__init(config)
        '(fitting) on the train_set only, and reusing these to ' ..
        'preprocess the valid_set and test_set.'}  
    )
-
+   local name = args.name
+   local train_set = args.train_set
+   local valid_set = args.valid_set
+   local test_set = args.test_set
+   local input_preprocess = args.input_preprocess
+   local target_preprocess = args.target_preprocess
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(name)
    --datasets
-   self:trainSet(train_set)
-   self:validSet(valid_set)
-   self:testSet(test_set)
+   self:SetOrGetAttributeSet(train_set, 'train')
+   self:SetOrGetAttributeSet(valid_set, 'valid')
+   self:SetOrGetAttributeSet(test_set, 'test')
    --preprocessing
    self:inputPreprocess(input_preprocess)
    self:targetPreprocess(target_preprocess)
    self:preprocess()
 end
 
--- exameple usage:  getView('train', 'input')
--- return View and DataSet
--- 
-function DataSource:getView(which_set, attribute)
+------------------------------------------------------------------------
+-- return data view and dataset of the DataSource
+-- @param which_set: string, 'train', 'valid', 'test'
+-- @param attribute: 'input' or 'targets'
+--
+-- @return dataview, dataset: View and DataSet of which_set and attribute
+-- usage: getView('train', 'input')
+------------------------------------------------------------------------
+function DataSource:GetView(which_set, attribute)
    self.log.trace('getView ', which_set, ' attribute: ', attribute)
-   which_set = which_set or 'train'
-   attribute = attribute or 'input'
-   
+   local which_set = which_set or 'train'
+   local attribute = attribute or 'input'
    local dataset
    if which_set == 'train' then
       dataset = self:trainSet()
@@ -89,13 +96,26 @@ function DataSource:getView(which_set, attribute)
    return dataview, dataset
 end
 
+function DataSource:getView(which_set, attribute)
+    return self:GetView(which_set, attribute)
+end
+------------------------------------------------------------------------
 -- a function to simplify calling :
+-- given AttributeSet's attribute and which_set
+--
 -- ds:[train,valid,test]Set():[inputs,targets]():forward(view, tensor_type).
--- all attributes are optional.
--- example usage : get('train', 'input', 'bchw', 'float')
--- return tenfor in-view, View, Dataset
-function DataSource:get(which_set, attribute, view, type)
-   view = view or 'default'
+-- 
+-- @param which_set: 'train' or 'valid' or 'test'
+-- @param attribute: 'input' or 'target'
+-- @param view: string [option] view setting of the dataview required
+-- @param type: required data's type
+--
+-- @example usage : get('train', 'input', 'bchw', 'float')
+-- @return tensor, dataview, dataset: tensor is data in `tensor_type` from
+-- dataview of [which_set][attribute]dataset
+------------------------------------------------------------------------
+function DataSource:GetData(which_set, attribute, view, type)
+   local view = view or 'default'
    local dataview, dataset = self:getView(which_set, attribute)
    local tensor_type
    if torch.type(type) == 'string' then
@@ -126,40 +146,95 @@ function DataSource:get(which_set, attribute, view, type)
    return tensor, dataview, dataset
 end
 
+function DataSource:get(which_set, attribute, view, type)
+    return GetData(which_set, attribute, view, type)
+end
+------------------------------------------------------------------------
 -- And we cannot have a get without a set:
-function DataSource:set(which_set, attribute, view, tensor)
+-- @param which_set: string
+-- @param attribute: string
+-- @param view: string
+-- @param tensor: torch.Tensor
+-- set the tensor value with [view] of the dataView in [which_set][attribute]set
+--
+-- @return dataview, dataset
+------------------------------------------------------------------------
+function DataSource:SetViewWithData(which_set, attribute, view, tensor)
    assert(view, "expecting view at arg 3")
    local dataview, dataset = self:getView(which_set, attribute)
    dataview:forward(view, tensor)
    return dataview, dataset
 end
 
-function DataSource:trainSet(train_set)
-   if train_set then
-      self.log.trace('[ds] set train_set')
-      self._train_set = train_set
-   end
+function DataSource:set(which_set, attribute, view, tensor)
+    self:SetViewWithData(which_set, attribute, view, tensor)
+end
 
-   self.log.trace('[ds] request train_set')
-   return self._train_set
+------------------------------------------------------------------------
+-- get or set the members
+-- @return [attributes]_set
+------------------------------------------------------------------------
+function DataSource:SetOrGetAttributeSet(data_set, attribute)
+    assert(attribute == 'train' or attribute == 'valid' or attribute == 'test')
+   if data_set then
+       self.log.trace('[ds] set data_set '..attribute)
+       self:SetAttributeSet(data_set, attribute)
+   end
+   self.log.trace('[ds] request data_set '..attribute)
+   return self:GetAttributeSet(attribute)
+end
+
+function DataSource:trainSet(train_set)
+   self:SetOrGetAttributeSet(train_set, 'train_set')
 end
 
 function DataSource:validSet(valid_set)
-   if valid_set then
-      self.log.trace('[ds] set valid_set')
-      self._valid_set = valid_set
-   end
-   self.log.trace('[ds] request valid_set')
-   return self._valid_set
+   self:SetOrGetAttributeSet(valid_set, 'valid_set')
 end
 
 function DataSource:testSet(test_set)
-   if test_set then
-      self.log.trace('[ds] set test_set')
-      self._test_set = test_set
-   end
-   self.log.trace('[ds] request test_set')
-   return self._test_set
+   self:SetOrGetAttributeSet(test_set, 'test_set')
+end
+
+------------------------------------------------------------------------
+-- get the members
+-- @return [attributes]_set
+------------------------------------------------------------------------
+function DataSource:GetAttributeSet(attribute)
+    assert(attribute == 'train' or attribute == 'valid' or attribute == 'test')
+    local data_set = self['_'..attribute..'_set']
+    assert(data_set.isDataSet)
+    return data_set
+end
+
+function DataSource:GetValidSet()
+   return self:GetAttributeSet('valid')
+end
+function DataSource:GetTrainSet()
+   return self:GetAttributeSet('train')
+end
+function DataSource:GetTestSet()
+   return self:GetAttributeSet('test')
+end
+
+------------------------------------------------------------------------
+-- given dataset and set the members
+-- @para [attributes]_set
+------------------------------------------------------------------------
+function DataSource:SetAttributeSet(data_set, attribute)
+    assert(data_set.isDataSet)
+    assert(attribute == 'train' or attribute == 'valid' or attribute == 'test')
+    self['_'..attribute..'_set'] = data_set
+end
+
+function DataSource:SetTrainSet(train_set)
+   self:SetAttributeSet(train_set, 'train')
+end
+function DataSource:SetValidSet(valid_set)
+   self:SetAttributeSet(valid_set, 'valid')
+end
+function DataSource:SetTestSet(test_set)
+   self:SetAttributeSet(test_set, 'test')
 end
 
 function DataSource:inputPreprocess(input_preprocess)
@@ -202,7 +277,6 @@ function DataSource:preprocess()
          target_preprocess=self:targetPreprocess(),
          can_fit=false}
    end
-   
    test_set = self:testSet()
    if test_set then
       test_set:preprocess{

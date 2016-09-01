@@ -2,6 +2,8 @@
 --[[ View ]]-- 
 -- Abstract class
 -- Adapter (design pattern) for torch.Tensor 
+-- the principle is that the [view] and torch.Tensor data are binding together
+-- in the view class
 ------------------------------------------------------------------------
 local View = torch.class("dp.View")
 View.isView = true

@@ -2,10 +2,22 @@
 --[[ Sampler ]]--
 -- DataSet iterator
 -- Sequentially samples batches from a dataset.
+-- As a sampler, it need to know the batch_size
+-- one sampler can be used to sample from different dataset at the time, i.e.
+-- samper if independent from dataSet
 ------------------------------------------------------------------------
 local Sampler = torch.class("dp.Sampler")
 Sampler.isSampler = true
 
+------------------------------------------------------------------------
+--[[ init Sampler ]]--
+--@param config:
+--  name
+--  batch_size: int = 128
+--  epoch_size: int = -1
+--  ppf: [optional]
+--  gc_freq: int = 50
+------------------------------------------------------------------------
 function Sampler:__init(config)
    config = config or {}
    assert(type(config) == 'table', "Constructor requires key-value arguments")
@@ -17,16 +29,14 @@ function Sampler:__init(config)
       'Iteration ends after an epoch (sampler-dependent) ',
       {arg='name', type='string', default='Sampler',
        help='name of the sampler'},
-      {arg='batch_size', type='number', default=128,
+      {arg='batch_size', type='number', req=true,
        help='Number of examples per sampled batches'},
-
       {arg='epoch_size', type='number', default=-1,
        help='Number of examples presented per epoch. '..
+       'Number of examples per epoch_size, '..
        'Default is to use then entire dataset per epoch'},
-
       {arg='ppf', type='function', 
        help='a function that preprocesses a Batch into another Batch'},
-
       {arg='gc_freq', type='number', default=50,
        help='collectgarbage() every gc_freq batches'}
    )
@@ -47,6 +57,17 @@ function Sampler:__init(config)
    log.info('[Sampler init done]')
 end
 
+
+
+------------------------------------------------------------------------
+--[[ setup Sampler]]--
+-- can be used to reset the batch_size?
+--
+--@param config: table:
+--  batch_size: int
+--  overwrite: bool
+--  mediator: dp.Mediator
+------------------------------------------------------------------------
 function Sampler:setup(config)
    self.log.trace('Sampler setup')
    assert(type(config) == 'table', "Setup requires key-value arguments")
@@ -56,13 +77,11 @@ function Sampler:setup(config)
       'Sampler:setup', 
       'Samples batches from a set of examples in a dataset. '..
       'Iteration ends after an epoch (sampler-dependent) ',
-      {arg='batch_size', type='number', default=128,
+      {arg='batch_size', type='number',
        help='Number of examples per sampled batches'},
-
       {arg='overwrite', type='boolean', default=false,
        help='overwrite existing values if not nil.' .. 
        'If nil, initialize whatever the value of overwrite.'},
-
       {arg='mediator', type='dp.Mediator',
        help='used for communication between objects'}
    )
@@ -87,10 +106,12 @@ function Sampler:report()
    return {batch_size = self._batch_size}
 end
 
+------------------------------------------------------------------------
 -- static function. Checks dataset type or gets dataset from datasource
 -- @param dataset, can be DataSource which contains a trainSet 
 --                  or dataView 
--- convert all to dataSet format, the return
+-- convert all to dataSet format, then return
+------------------------------------------------------------------------
 function Sampler.toDataset(dataset)
    if dataset.isDataSource then
       -- assumes dataset is the DataSource's training set
@@ -100,8 +121,9 @@ function Sampler.toDataset(dataset)
       end
    elseif dataset.isView then
       -- assumes dataset is a set of inputs in training set
+      -- create a new ['train']['input']dataset with View
       dataset = dp.DataSet{which_set='train', 
-        inputs=dataset}
+                            inputs=dataset}
    end
    assert(dataset.isDataSet, "Error : unsupported dataset type.")
    return dataset
@@ -116,15 +138,21 @@ function Sampler:collectgarbage()
    end
 end
 
--- Returns an `iterator` over samples for one epoch
+------------------------------------------------------------------------
+-- Build an `iterator` over samples for one epoch
 -- Default is to iterate sequentially over all examples
--- @param dataset dataSet which include inputDataView and outputDataView
--- return an function object: an instance of sampler in Sampler class
--- which has member function call by (batch)
+-- @param dataset: dataSet which include inputDataView and outputDataView
+-- @return an function object: an instance of sampler in Sampler class
+--  which has member function call by (batch) and return batch, nSample, epochSize 
+-- useage:
+--  local sampler = dp.Sampler:samplerEpoch(dataset)
+--  local batch = sampler(batch) or batch = sampler()
+------------------------------------------------------------------------
 function Sampler:sampleEpoch(dataset)
    dataset = dp.Sample.toDataset(dataset)
    local nSample = dataset:nSample()
    local epochSize = self._epoch_size or nSample
+   -- start index of the sample in dataset
    self._start = self._start or 1 -- if self._start not set, default from 1
    local nSampled = 0
    local stop
@@ -150,12 +178,13 @@ function Sampler:sampleEpoch(dataset)
       dataset:sub(batch, self._start, stop)
       local indices = batch:indices() or torch.Tensor()      
       -- metadata
-      batch:setup{
-         batch_iter=stop, 
+      batch:reset{
+         batch_iter=stop, -- number of examples seen so far 
          batch_size=self._batch_size,
          n_sample=stop - self._start + 1, 
-         indices=indices:range(self._start, stop) -- init indices in batch
-      }
+         indices=indices:range(self._start, stop) -- indices of the samples of batch in dataset 
+         }
+
       -- data preprocesses, if no return batch 
       batch = self._ppf(batch)
       nSampled = nSampled + stop - self._start + 1
@@ -189,7 +218,6 @@ function Sampler:sampleEpochAsync(dataset)
       -- recurrently put #epochSize sample
       if nSampledPut < epochSize then
          stop = math.min(self._start+self._batch_size - 1, nSample)
-         
          --[[ get batch]]--
          -- up values
          local uvstop = stop

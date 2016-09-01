@@ -35,7 +35,6 @@ function VideoView:hasAxis(axis_char, view)
     end
 end
 
-
 -- View used by SpacialConvolutionCUDA
 function VideoView:chwb()
     if self._view == 'chwb' then
