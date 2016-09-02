@@ -12,6 +12,8 @@ function DataView:__init(view, input, name)
    parent.__init(self, name)
    self.log.trace(name, ' view init with view ', view)
    self._is_data_filled = false
+   assert(view and input)
+   -- require when init
    if view and input then
       self.log.trace('\t calling forward')
       self:forward(view, input)
@@ -419,7 +421,7 @@ end
 
 ----------------------------------------------------
 --[[ filling view with data ]]--
---
+-- use for LoadWholeDataSet
 -- When v is provided, reuse its data (a torch.Tensor)
 -----------------------------------------------------
 function DataView:CreateSubViewWithIndex(indices)

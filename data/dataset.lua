@@ -53,60 +53,29 @@ function DataSet:CreateEmptyBatchIfNil(batch)
     }
 end
 
-function DataSet:CreateBatchWithSize(batch_size)
-    assert(batch_size > 0)
-    local batch = self:CreateEmptyBatchIfNil()
-    return self:FillBatchWithSize(batch, batch_size)
-end
-
-function DataSet:CreateBatchWithSub(start, stop)
-    assert(start > 0 and stop > start)
-    local batch = self:CreateEmptyBatchIfNil()
-    return self:FillBatchWithSub(batch, start, stop)
-end
 
 function DataSet:CreateBatchWithindex(indices)
-    assert(torch.isTensor(indices))
-    local batch = self:CreateEmptyBatchIfNil()
-    return self:FillBatchWithIndex(batch, indices)
+    error('depreciated')
 end
 
+
 function DataSet:FillBatchWithSize(batch, batch_size)
-    assert(batch.isBatch)
-    batch:SetView('input', self:inputs():sub(1, batch_size))
-    if self:targets() then
-        batch:SetView('target', self:targets():sub(1, batch_size))
-    end
-    return batch
+    error('not implementm different for load once or not data')
 end
 
 function DataSet:FillBatchWithSub(batch, start, stop)
-    assert(batch.isBatch, "Expecting dp.Batch at arg 1")
-    assert(batch:IsFilled())
-    batch:SetView('input', 
-            self:GetView('input'):CreateSubViewWithSub(start, stop))
-    if self:targets() then
-        batch:SetView('target', 
-            self:GetView('target'):CreateSubViewWithSub(start, stop))
-    end
-    return batch  
+    error('not implementm different for load once or not data')
 end
 
 function DataSet:FillBatchWithIndex(batch, indices)
-    assert(batch.isBatch, "Expecting dp.Batch at arg 1")
-    assert(batch:IsFilled())
-    batch:SetView('input', 
-            self:GetView('input'):CreateBatchWithIndex(indices))
-    if self:targets() then
-        batch:SetView('target', 
-            self:GetView('target'):CreateBatchWithIndex(indices))
-    end
-    return batch  
+    error('not implementm different for load once or not data')
 end
 
 function DataSet:batch(batch_size)
    self.log.trace('calling batch with batch_size: ', batch_size)
-   return self:CreateBatchWithSize(batch_size)
+    assert(batch_size > 0)
+    local batch = self:CreateEmptyBatchIfNil()
+    return self:FillBatchWithSize(batch, batch_size)
 end
 ---------------------------------------------------------------------------
 -- reuses the inputs and targets (so don't modify them)
@@ -129,7 +98,9 @@ function DataSet:sub(batch, start, stop)
       end
       self.log.trace('building batch with size ', self:nSample())
       -- get a DataView Contains sub_data from start to stop of the orignal inputs
-      return self:CreateBatchWithSub(start, stop)
+    assert(start > 0 and stop > start)
+    local batch = self:CreateEmptyBatchIfNil()
+    return self:FillBatchWithSub(batch, start, stop)
   end
    self.log.trace('dataset: sub from ', start, ' to ', stop)
    return self:FillBatchWithSub(batch, start, stop)
@@ -150,9 +121,11 @@ end
 function DataSet:index(batch, indices)
    if (not batch) or (not indices) then 
       indices = indices or batch
+
+    assert(torch.isTensor(indices))
+    local batch = self:CreateEmptyBatchIfNil()
+    return self:FillBatchWithIndex(batch, indices)
       return self:CreateBatchWithIndex(indices) 
    end
-
    return self:FillBatchWithIndex(batch, indices)
-
 end

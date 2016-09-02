@@ -22,14 +22,17 @@ function RandomSampler:sampleEpoch(dataset)
       if nSampled >= epochSize then
          return
       end
+      if batch.IsBatch then 
+          assert(batch.IsFilled()) -- must be filled whtn inited
+      else
+         batch = dataset:InitBatchWithSize(self._batch_size)
+      end
       -- init a batch
-      batch = batch or dataset:sample(self._batch_size)
+      -- batch = dataset:InitBatchWithSize
       -- inputs and targets
-      dataset:sample(batch, 
-                    self._batch_size,
-                    nil) -- sampleFunc
+      dataset:FillBatchRandomSample(batch, self._batch_size, nil) -- sampleFunc
       -- metadata
-      batch:setup{
+      batch:reset{
          batch_iter=nSampled, 
          batch_size=self._batch_size,
          n_sample=self._batch_size
@@ -56,8 +59,8 @@ function RandomSampler:sampleEpochAsync(dataset)
    local nSampledPut = 0
    local nSampledGet = 0
      
+   local startThreadSampleBatch = function()
    -- build iterator
-   local sampleBatch = function(batch, putOnly)
       self.log.trace('.. Get: ', nSampledGet, ' Put: ', nSampledPut, ' epochSize ', epochSize)
       if nSampledGet >= epochSize then
          return
@@ -73,16 +76,19 @@ function RandomSampler:sampleEpochAsync(dataset)
             self.log.trace('batch is nil')
          end
 
-         dataset:sampleAsyncPut(batch, self._batch_size, 
-            nil, -- used dataset:sampleFunc
-            function(batch) -- callback
-               local indices = batch:indices() or torch.Tensor()
-               -- metadata
-               batch:setup{batch_iter=uvstop, 
-                    batch_size=batch:nSample()}
-               batch = self._ppf(batch)
-            end)
+       local batch = dataset:CreateBatchWithSize(batch_size)
+         local callback_func = function(batch)
+             -- metadata
+             batch:setup{
+                 batch_iter=uvstop, 
+                 batch_size=batch:nSample()
+             }
+             batch = self._ppf(batch)
+         end
+       local sample_func = nil 
+       dataset:AsyncAddRandomSampleJob(batch, self._batch_size, sample_func, callback_func)
          
+         -- batch = self._ppf(batch)
          nSampledPut = nSampledPut + self._batch_size
          self._start = self._start + self._batch_size
          if self._start >= nSample then
@@ -90,22 +96,22 @@ function RandomSampler:sampleEpochAsync(dataset)
          end
       end
       
-      if not putOnly then
+   local sampleBatch = function(batch)
+      startThreadSampleBatch()
          self.log.trace('not putOnly, call asyncGet')
          batch = dataset:asyncGet()
          nSampledGet = nSampledGet + self._batch_size
          self:collectgarbage() 
          return batch, math.min(nSampledGet, epochSize), epochSize
-      end
    end
    
    assert(dataset.isAsync, "expecting asynchronous dataset")
    -- empty the async queue
    dataset:synchronize()
    -- fill task queue with some batch requests
-   for tidx=1, dataset.nThread do
+   for tidx = 1, dataset.nThread do
       log.trace('samplingBatch as thread: ', tidx)
-      sampleBatch(nil, true)
+      startThreadSampleBatch()
    end
    
    return sampleBatch

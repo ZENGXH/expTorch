@@ -1,6 +1,8 @@
 ------------------------------------------------------------------------
 --[[ Sampler ]]--
--- DataSet iterator, abstract
+-- DataSet iterator, <abstract>
+-- for the real dataset iterator, need to define sampleEpoch and sampleEpochAsync
+--
 -- Sequentially samples batches from a dataset.
 -- As a sampler, it need to know the batch_size
 -- one sampler can be used to sample from different dataset at the time, i.e.
@@ -27,6 +29,8 @@ Sampler.isSampler = true
 --  epoch_size: int = -1
 --  ppf: [optional]
 --  gc_freq: int = 50
+--  overwrite bool,??
+--  mediator
 ------------------------------------------------------------------------
 function Sampler:__init(config)
    config = config or {}
@@ -48,11 +52,20 @@ function Sampler:__init(config)
       {arg='ppf', type='function', 
        help='a function that preprocesses a Batch into another Batch'},
       {arg='gc_freq', type='number', default=50,
-       help='collectgarbage() every gc_freq batches'}
+       help='collectgarbage() every gc_freq batches'},
+      -- {arg='overwrite', type='boolean', default=false,
+      -- help='overwrite existing values if not nil.' .. 
+      -- 'If nil, initialize whatever the value of overwrite.'},
+      {arg='mediator', type='dp.Mediator',
+       help='used for communication between objects'}
+ 
    )
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
-   self._ppf = args.ppf or function(batch) return batch end
+
+   self._ppf = args.ppf or function(batch) 
+        return batch 
+    end
    self._gc_freq = args.gc_freq
    self:setBatchSize(args.batch_size)
    self._epoch_size = args.epoch_size
@@ -64,52 +77,28 @@ function Sampler:__init(config)
    else
       self._epoch_size = nil
    end
-   log.info('[Sampler init done]')
-end
-
-
-
-------------------------------------------------------------------------
---[[ setup Sampler]]--
--- can be used to reset the batch_size?
---
---@param config: table:
---  batch_size: int
---  overwrite: bool
---  mediator: dp.Mediator
-------------------------------------------------------------------------
-function Sampler:setup(config)
-   self.log.trace('Sampler setup')
-   assert(type(config) == 'table', "Setup requires key-value arguments")
-   local args = {}
-   --batch_size, overwrite, mediator = xlua.unpack(
-   dp.helper.unpack_config(args,{config},
-      'Sampler:setup', 
-      'Samples batches from a set of examples in a dataset. '..
-      'Iteration ends after an epoch (sampler-dependent) ',
-      {arg='batch_size', type='number',
-       help='Number of examples per sampled batches'},
-      {arg='overwrite', type='boolean', default=false,
-       help='overwrite existing values if not nil.' .. 
-       'If nil, initialize whatever the value of overwrite.'},
-      {arg='mediator', type='dp.Mediator',
-       help='used for communication between objects'}
-   )
-   if args.batch_size and (not self._batch_size or args.overwrite) then
-      self:setBatchSize(args.batch_size)
-   end
    self._mediator = args.mediator
+   log.info('[Sampler init done]')
+   self._start = 1 -- init with 1
 end
 
-function Sampler:setBatchSize(batch_size)
-   if torch.type(batch_size) ~= 'number' or batch_size < 1 then
-      error("Expecting positive batch_size get ", batch_size)
-   end
+
+function Sampler:ResetBatchSize(batch_size)
+   assert(torch.isTypeOf(batch_size, int) and batch_size > 0)
    self._batch_size = batch_size
 end
 
-function Sampler:batchSize()
-   return self._batch_size
+function Sampler:GetBatchSize()
+    return self._batch_size
+end
+
+
+function Sampler:ResetEpochSize(epoch_size)
+    assert(torch.isTypeOf(epoch_size, int) and epoch_size > 0)
+    self._epoch_size = expoch_size
+end
+function Sampler:GetEpochsize()
+    return self._epoch_size
 end
 
 function Sampler:report()
@@ -148,17 +137,31 @@ function Sampler:collectgarbage()
    end
 end
 
-
 function Sampler:sampleEpoch(dataset)
-    self.log.fatal('DEPRECIATED without Implemented, Sampler is abstract, use InorderSampler instead')
-    return dp.InorderSampler.sampleEpoch(self, dataset)
+    error('without Implemented, Sampler is abstract, use InorderSampler instead')
 end
 
 function Sampler:sampleEpochAsync(dataset)
-    self.log.fatal('DEPRECIATED without Implemented, Sampler is abstract, use InorderSampler instead')
-    return dp.InorderSampler.sampleEpochAsync(self, dataset)
+    error('without Implemented, Sampler is abstract, use InorderSampler instead')
 end
+
 -- change normal sampleEpoch to sampleEpochAsync
-function Sampler:async()
-   self.sampleEpoch = self.sampleEpochAsync
+-- function Sampler:async()
+--    self.sampleEpoch = self.sampleEpochAsync
+-- end
+
+function Sampler:setup(config)
+  self.log.fatal('depreciate') 
+  self.__init(config) -- redirect
 end
+
+function Sampler:setBatchSize(batch_size)
+   self.log.fatal('depreciated')
+   return self:ResetBatchSize(batch_size)
+end
+function Sampler:batchSize()
+   self.log.fatal('depreciated')
+   return self:GetBatchSize()
+end
+
+

@@ -46,11 +46,11 @@ function BaseSet:__init(config)
    self:whichSet(args.which_set)
    self._has_target_view = false
    if args.inputs then 
-       self.log.trace('get inputs when init')
+       self.log.fatal('set inputs explictly please')
        self:SetView('inputs', args.inputs)
    end
    if args.targets then 
-       self.log.trace('get targets when init')
+       self.log.fatal('set targets explictly please')
        self:SetView('targets', args.targets)
    end
 end
