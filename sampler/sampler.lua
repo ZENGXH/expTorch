@@ -6,9 +6,9 @@
 -- Sequentially samples batches from a dataset.
 -- As a sampler, it need to know the batch_size
 -- one sampler can be used to sample from different dataset at the time, i.e.
--- samper if independent from dataSet
+-- sampler if independent from dataSet
 --
--- difference between sampleEpoch and sampleEpochAsync
+-- difference between `sampleEpoch` and `sampleEpochAsync`
 -- knowing the start and end index of the data in the dataSet
 -- `sampleEpoch` will call `dataset:sub` to get the data and filled then into the
 -- batch in iterators
@@ -25,9 +25,11 @@ Sampler.isSampler = true
 --[[ init Sampler ]]--
 --@param config:
 --  name
---  batch_size: int = 128
---  epoch_size: int = -1
---  ppf: [optional]
+--  batch_size: int = 128, number of samples in a batch, use for request 
+--      for batch from dataset 
+--  epoch_size: int = -1, number of samples in a epoch, -1 means the 
+--      whole data set size
+--  ppf: [optional] preprocesser
 --  gc_freq: int = 50
 --  overwrite bool,??
 --  mediator
@@ -68,7 +70,7 @@ function Sampler:__init(config)
     end
    self._gc_freq = args.gc_freq
    self:setBatchSize(args.batch_size)
-   self._epoch_size = args.epoch_size
+   self._epoch_size = (args.epoch_size > 0 and args.epoch_size) or nil
    self._gc_n_batch = 0
    if args.epoch_size > 0 then
       if args.batch_size > args.epoch_size then
@@ -80,29 +82,6 @@ function Sampler:__init(config)
    self._mediator = args.mediator
    log.info('[Sampler init done]')
    self._start = 1 -- init with 1
-end
-
-
-function Sampler:ResetBatchSize(batch_size)
-   assert(torch.isTypeOf(batch_size, int) and batch_size > 0)
-   self._batch_size = batch_size
-end
-
-function Sampler:GetBatchSize()
-    return self._batch_size
-end
-
-
-function Sampler:ResetEpochSize(epoch_size)
-    assert(torch.isTypeOf(epoch_size, int) and epoch_size > 0)
-    self._epoch_size = expoch_size
-end
-function Sampler:GetEpochsize()
-    return self._epoch_size
-end
-
-function Sampler:report()
-   return {batch_size = self._batch_size}
 end
 
 ------------------------------------------------------------------------
@@ -128,6 +107,45 @@ function Sampler.toDataset(dataset)
    return dataset
 end
 
+------------------------------------------------------------------------
+-- <abstract> methof to sample for one epoch's data, 
+-- sampleEpochAsync for the sampling of dataset  which support 
+-- multithreading 
+------------------------------------------------------------------------
+function Sampler:sampleEpoch(dataset)
+    error('without Implemented, Sampler is abstract, use InorderSampler instead')
+end
+
+function Sampler:sampleEpochAsync(dataset)
+    error('without Implemented, Sampler is abstract, use InorderSampler instead')
+end
+
+
+function Sampler:report()
+   return {batch_size = self._batch_size}
+end
+
+------------------------------------------------------------------------
+-- get and set the batch_size and epoch_size
+------------------------------------------------------------------------
+function Sampler:ResetBatchSize(batch_size)
+   assert(torch.isTypeOf(batch_size, int) and batch_size > 0)
+   self._batch_size = batch_size
+end
+
+function Sampler:GetBatchSize()
+    return self._batch_size
+end
+
+function Sampler:ResetEpochSize(epoch_size)
+    assert(torch.isTypeOf(epoch_size, int) and epoch_size > 0)
+    self._epoch_size = expoch_size
+end
+
+function Sampler:GetEpochsize()
+    return self._epoch_size
+end
+
 function Sampler:collectgarbage()
    self._gc_n_batch = self._gc_n_batch + 1
    if self._gc_n_batch >= self._gc_freq then
@@ -137,13 +155,6 @@ function Sampler:collectgarbage()
    end
 end
 
-function Sampler:sampleEpoch(dataset)
-    error('without Implemented, Sampler is abstract, use InorderSampler instead')
-end
-
-function Sampler:sampleEpochAsync(dataset)
-    error('without Implemented, Sampler is abstract, use InorderSampler instead')
-end
 
 -- change normal sampleEpoch to sampleEpochAsync
 -- function Sampler:async()

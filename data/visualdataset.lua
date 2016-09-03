@@ -1,9 +1,10 @@
--------------
+------------------------------------------------------------------------
 --[[ VisualDataSet ]]--
---for common function of VisualDataSet and videoclassset
+-- for common function of VisualDataSet and videoclassset
 -- interface
-----------------
+------------------------------------------------------------------------
 local VisualDataSet, parent = torch.class("dp.VisualDataSet", "dp.DataSet")
+
 function VisualDataSet:__init(config)
     parent.__init(self, config)
    -- buffers
@@ -14,28 +15,28 @@ function VisualDataSet:buildIndex()
     error('not implement')
 end
 
-function VisualDataSet:saveIndex()    error('not implement')
+function VisualDataSet:saveIndex()    
+    error('not implement')
 end
 
 function VisualDataSet:loadIndex()
     error('not implement')
 end
 
-
-
--------------------------------------------------------------
+------------------------------------------------------------------------
 -- create a batch with xxViewInput and ClassViewTargets
--- with vigen batchSize
+-- with batchSize
 -- @param batch_size
 -- 
--- @return dp.Batch
--------------------------------------------------------------
+-- @return functio object, take `batch` as input, output a dp.Batch
+------------------------------------------------------------------------
 
 --[[ factory ]]
-
 function VisualDataSet:FillBatchWithSize(batch, batch_size)
     error('confused function, removed')
 end
+
+------------------------------------------------------------------------
 -- create a batch with 'which_set' and 'epoch_size'
 -- fill the batch with input View and target View with batch_size shape
 -- if the batch has been create but not input View and target View set, please
@@ -60,7 +61,7 @@ function VisualDataSet:InitBatchWithSize(batch_size)
     end
    return batch
 end
--------------------------------------------------------------
+------------------------------------------------------------------------
 -- nSample(), nSample(class)
 -- return number of sample in the dataset
 --   or number of sample in some class required by className or classIndices
@@ -68,7 +69,7 @@ end
 -- @param list:
 -- 
 -- @return sample number: Int
--------------------------------------------------------------
+------------------------------------------------------------------------
 --[[overwrite]]--
 function VisualDataSet:nSample(class, list)
    list = list or self.classList
@@ -80,7 +81,13 @@ function VisualDataSet:nSample(class, list)
       return list[class]:size(1)
    end
 end
+
 function VisualDataSet:getImageBuffer(i)
+    return self:GetImageBuffer(i)
+end
+
+function VisualDataSet:GetImageBuffer(i)
+   error('not implement here, buffer has tensor in size based on sub-class')
    self._imgBuffers[i] = self._imgBuffers[i] or torch.FloatTensor()
    return self._imgBuffers[i]
 end
@@ -93,7 +100,7 @@ function VisualDataSet:loadImage(path)
     error('not implement')
 end
 
--------------------------------
+------------------------------------------------------------------------
 -- <abstract> do the combining of tensor in to a batch in the subclass since
 -- then the output and input shape may be different
 -- @param inputTable
@@ -103,20 +110,21 @@ end
 --
 -- @return inputTensor
 -- @return outputTensor
-----------------------------------
+------------------------------------------------------------------------
 function VisualDataSet:tableToTensor(...)
     error('not implement')
 end
 
---------------------------------
+------------------------------------------------------------------------
 -- init multithread in worker, set up dataset in each worker,
 -- set up a batch for each dataset with filled
 --
 -- @param nThread: int
--------------------------------
-function VisualDataSet:multithread(nThread)
+------------------------------------------------------------------------
+function VisualDataSet:multithread(nThread, batch_size)
+   assert(nThread and batch_size)
    local nThread = nThread or 2
-   assert(batch_size and batch_size > 0)
+   assert(batch_size and batch_size > 0, 'batch_size required')
    if not paths.filep(self._cache_path) then
       -- workers will read a serialized index to speed things up
       self:saveIndex()
@@ -125,8 +133,7 @@ function VisualDataSet:multithread(nThread)
    local mainSeed = os.time()
    local config = self._config
    config.cache_mode = 'readonly'
-   config.verbose = self._verbose
-   
+   config.verbose = self._verbose 
    local threads = require "threads"
    threads.Threads.serialization('threads.sharedserialize')
    self.log.info('init threads with dataset: ', self._class_set)
@@ -135,10 +142,9 @@ function VisualDataSet:multithread(nThread)
       nThread,
       -- all function below will be executed in all thread
       function() -- make a separated f1 containing all the definitions 
-        print('threading')
+        -- print('threading')
         require 'dprnn.dprnn'
       end,
-    
       function(idx) -- other code in f2
          opt = options -- pass to all donkeys via upvalue
          tid = idx
@@ -156,14 +162,13 @@ function VisualDataSet:multithread(nThread)
    self._recv_batches = dp.Queue() -- batches received in main from threads
    self._buffer_batches = dp.Queue() -- buffered batches
   
-
    -- public variables
    self.nThread = nThread
    self.isAsync = true
    -- #TODO : init _buffer_batches with size nThread
 end
 
---------------------------------------------------------------------
+------------------------------------------------------------------------
 -- call by InorderSampler, given batch created with batch_size,
 -- sample at start, for #nSample, update the self._start
 -- send request to worker : put request into queue
@@ -174,7 +179,7 @@ end
 --          for order sampling, the start is remembered by sampler, since that
 --          there different dataset working in different thread
 -- @param callback
---------------------------------------------------------------------
+------------------------------------------------------------------------
 function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)   
    batch = self._buffer_batches:get() 
    assert(batch.isBatch and batch.IsFilled())
@@ -182,8 +187,8 @@ function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)
    local target = batch:GetView('target'):GetInputTensor()
    assert(input and target) 
    self._send_batches:put(batch)
-   self._threads:addjob(
-   function() -- the job callback (runs in data-worker thread)
+   -- the job callback (runs in data-worker thread)
+   local worker_job =  function() 
        -- tbatch is a (empty) batch container work in current thread
        -- put not inputTensor and targetTensor input tBatch container
        -- call batchFill function, i.e. the acture sample function
@@ -195,9 +200,9 @@ function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)
        return input, target
        -- the callback return one ore many values which will be 
        -- serialized and unserialized as arguments to the endcallback function. 
-   end,
-
-   function(input, target) -- the endcallback (runs in the main thread)
+   end
+   -- the endcallback (runs in the main thread)
+   local main_thread_job = function(input, target) 
       -- feed the input and target into 
       -- pull batch from send batch buffer, reset the input, push to recv batch
       -- buffer
@@ -210,7 +215,8 @@ function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)
        batch:GetView('target'):setClasses(self._classes)
        self._recv_batches:put(batch)
    end
-   )
+
+   self._threads:addjob(worker_job, main_thread_job)
 end
 
 function VisualDataSet:AsyncAddRandomSampleJob(batch, batch_size, sample_func, callback)
@@ -234,33 +240,31 @@ function VisualDataSet:AsyncAddRandomSampleJob(batch, batch_size, sample_func, c
    self.log.trace('put batch')
    assert(self._threads:acceptsjob())
    self.log.trace('start add job')
-   self._threads:addjob(
-      -- the job callback (runs in data-worker thread)
-      function()
-         -- set the transfered storage
-         print('setStorage')
-         torch.setFloatStorage(input, inputPointer)
-         torch.setIntStorage(target, targetPointer)
-         local view =  'btchw'
-         tbatch:inputs():forward(view, input)
-         tbatch:targets():forward('b', target)
-         print('forward')
-         -- fill tbatch wilth inputData and targetData         
-         dataset:FillBatchRandomSample(tbatch, nSample)
-         assert(tbatch:inputs():input()) 
-         assert(tbatch:targets():input()) 
-         -- transfer it back to the main thread
-         local istg = tonumber(ffi.cast('intptr_t', 
-            torch.pointer(input:storage())))
-         local tstg = tonumber(ffi.cast('intptr_t', 
-            torch.pointer(target:storage())))
-         input:cdata().storage = nil
-         target:cdata().storage = nil
-         return input, target, istg, tstg
-      end,
+   local view = self._input_shape
 
-      -- the endcallback (runs in the main thread)
-      function(input, target, istg, tstg)
+   -- the job callback (runs in data-worker thread)
+   local worker_job = function()
+       -- set the transfered storage
+       torch.setFloatStorage(input, inputPointer)
+       torch.setIntStorage(target, targetPointer)
+       tbatch:inputs():forward(view, input)
+       tbatch:targets():forward('b', target)
+       -- fill tbatch wilth inputData and targetData         
+       dataset:FillBatchRandomSample(tbatch, nSample)
+       assert(tbatch:inputs():input()) 
+       assert(tbatch:targets():input()) 
+       -- transfer it back to the main thread
+       local istg = tonumber(ffi.cast('intptr_t', 
+       torch.pointer(input:storage())))
+       local tstg = tonumber(ffi.cast('intptr_t', 
+       torch.pointer(target:storage())))
+       input:cdata().storage = nil
+       target:cdata().storage = nil
+       return input, target, istg, tstg
+   end  
+
+   -- the endcallback (runs in the main thread)
+   local main_thread_job = function(input, target, istg, tstg)
          local batch = self._send_batches:get()
          torch.setFloatStorage(input, istg)
          torch.setIntStorage(target, tstg)
@@ -271,8 +275,9 @@ function VisualDataSet:AsyncAddRandomSampleJob(batch, batch_size, sample_func, c
          batch:targets():setClasses(self._classes)
          -- self.log.trace('putting to _recv_batches: ', #self._recv_batches)
          self._recv_batches:put(batch)
-      end
-   )
+     end  local main_thread_job = function()
+
+   self._threads:addjob(worker_job, main_thread_job)
 
 end
 
@@ -301,5 +306,5 @@ function VisualDataSet:asyncGet()
    return self._recv_batches:get()
 end
 
-function 
 
+-- vim:ts=3 ss=3 sw=3 expandtab

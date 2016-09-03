@@ -2,7 +2,8 @@
 --[[ BaseSet ]]--
 -- Base class inherited by DataSet and Batch.
 -- @Method:
--- 1. get and set the members
+-- 1. get and set the members by [which_set][attribute]
+--
 -- 2. set IO_preprocess to inputsVIew and targetsVIew at the same time
 -- both dataset and batch have inputView and targetView, and Preprocesses
 -- 
@@ -15,10 +16,10 @@ BaseSet.isBaseSet = true
 -- Use to manage inputsDataView & targetDataView for train/valid/test dataset
 -- can be imageDataSet ot VideoDataSet, work with classDataSet(GT)
 --
--- @param condig: table: include
---  [which_set: string = 'train']
---  [inputs: View]
---  [targets: View]
+-- @param config: table: include
+--  which_set: string = 'train'
+--  [inputs: View] -- DEPRECATED
+--  [targets: View] -- DEPRECATED
 ------------------------------------------------------------------------
 function BaseSet:__init(config)
    self._has_input_view = false
@@ -121,33 +122,12 @@ end
 function BaseSet:IsFilled()
    return self._has_input_view
 end
--- become DEPRECATED
-function BaseSet:inputs(inputs)
-   if inputs then
-      self.log.tracefrom('set dataView: inputs')
-      return self:SetView('input', inputs)
-   else
-      self.log.tracefrom('request dataView: inputs')
-      return self:GetView('input')
-   end
-end
-
--- get/set target dp.View
-function BaseSet:targets(targets)
-   if targets then
-      self.log.tracefrom('set dataView: targets')
-      return self:SetView('target', targets)
-   end
-   self.log.tracefrom('request dataView: targets')
-   return self:GetView('target')
-end
 
 ----------------------------------------------------
 -- Preprocesses are applied to Views
 -- @param config
---
 ---------------------------------------------------
-function BaseSet:preprocess(config)
+function BaseSet:SetPreprocess(config)
    config = config or {}
    assert(torch.type(config) == 'table' and not config[1], 
       "Constructor requires key-value arguments")
@@ -180,6 +160,32 @@ function BaseSet:preprocess(config)
    end
 end
 
+---------------------------------------------------------------
+-- become DEPRECATED
+function BaseSet:preprocess(config)
+    self.log.fatal('DEPRECATED cann SetPreprocess instead')
+    return self:SetPreprocess(config)
+end
+
+function BaseSet:inputs(inputs)
+   if inputs then
+      self.log.tracefrom('set dataView: inputs')
+      return self:SetView('input', inputs)
+   else
+      self.log.tracefrom('request dataView: inputs')
+      return self:GetView('input')
+   end
+end
+
+-- get/set target dp.View
+function BaseSet:targets(targets)
+   if targets then
+      self.log.tracefrom('set dataView: targets')
+      return self:SetView('target', targets)
+   end
+   self.log.tracefrom('request dataView: targets')
+   return self:GetView('target')
+end
 -- BEGIN DEPRECATED (June 13, 2015)
 function BaseSet:setInputs(inputs)
    assert(inputs.isView, 

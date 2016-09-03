@@ -75,13 +75,21 @@ function View:backwardGet(view, tensor_type)
 end
 
 -- This method return the index of axis_char in string view
-function View:findAxis(axis_char, view)
+function View:FindAxis(axis_char, view)
    view = view or self._view
    local axis_pos = view:find(axis_char)
    if not axis_pos then
       error("Provided view '"..view.."' has no axis '"..axis_char.."'", 2)
    end
    return axis_pos
+end
+
+function View:findAxis(axis_char, view)
+    return self:FindAxis(axis_char, view)
+end
+
+function View:IsBatchFirst()
+    return self:FindAxis('b') == 1
 end
 
 -- Returns number of samples
