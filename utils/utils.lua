@@ -253,7 +253,7 @@ end
 
 function Queue:empty()
    local isEmpty = (self.first > self.last)
-   log.trace('Queue empty? ', isEmpty)
+   log.tracefromfrom('Queue empty? ', isEmpty)
    return isEmpty
 end
  

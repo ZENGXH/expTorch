@@ -69,7 +69,7 @@ function Sampler:__init(config)
         return batch 
     end
    self._gc_freq = args.gc_freq
-   self:setBatchSize(args.batch_size)
+   self:ResetBatchSize(args.batch_size)
    self._epoch_size = (args.epoch_size > 0 and args.epoch_size) or nil
    self._gc_n_batch = 0
    if args.epoch_size > 0 then
@@ -129,7 +129,8 @@ end
 -- get and set the batch_size and epoch_size
 ------------------------------------------------------------------------
 function Sampler:ResetBatchSize(batch_size)
-   assert(torch.isTypeOf(batch_size, int) and batch_size > 0)
+   assert(torch.type(batch_size) ==  'number', batch_size)
+   assert(batch_size > 0, 'get batch_size '..tostring(batch_size))
    self._batch_size = batch_size
 end
 
@@ -138,7 +139,7 @@ function Sampler:GetBatchSize()
 end
 
 function Sampler:ResetEpochSize(epoch_size)
-    assert(torch.isTypeOf(epoch_size, int) and epoch_size > 0)
+   assert(torch.type(epoch_size) ==  'number', epoch_size)
     self._epoch_size = expoch_size
 end
 
@@ -157,11 +158,12 @@ end
 
 
 -- change normal sampleEpoch to sampleEpochAsync
--- function Sampler:async()
---    self.sampleEpoch = self.sampleEpochAsync
--- end
+function Sampler:async()
+   self.sampleEpoch = self.sampleEpochAsync
+end
 
 function Sampler:setup(config)
+  self.log.tracefrom('')
   self.log.fatal('depreciate') 
   self.__init(config) -- redirect
 end
@@ -175,4 +177,7 @@ function Sampler:batchSize()
    return self:GetBatchSize()
 end
 
-
+function Sampler:SetMediator(m)
+    assert(m.isMediator)
+    self._mediator = m
+end

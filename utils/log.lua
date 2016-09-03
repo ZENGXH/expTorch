@@ -12,7 +12,7 @@ local log = { _version = "0.1.0" }
 
 log.usecolor = true
 log.outfile = log.outfile or paths.concat(os.getenv('PWD'), 'log')
-log.level = "trace"
+log.level = "info"
 log.name = " " 
 
 function log.SetLoggerName(name)

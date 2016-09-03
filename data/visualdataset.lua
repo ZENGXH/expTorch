@@ -183,6 +183,7 @@ end
 -- @param callback
 ------------------------------------------------------------------------
 function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)   
+   self.log.trace('i am adding job')
    if not batch or (batch and batch.isBatch and batch.IsFilled()) then
       -- buffer_batches are filled in :synchronize() by batch in _recv_batches
       local batch_size_cur = stop - start + 1
@@ -193,15 +194,20 @@ function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)
    local target = batch:GetView('target'):GetInputTensor()
    assert(input and target) 
    self._send_batches:put(batch)
+   local _input_shape = self._input_shape
+   local _output_shape = self._output_shape
+   self.log.trace('_input_shape: ', self._input_shape)
+   
    -- the job callback (runs in data-worker thread)
-   local worker_job =  function() 
+   local worker_job = function() 
       -- tbatch is a (empty) batch container work in current thread
       -- put not inputTensor and targetTensor input tBatch container
       -- call batchFill function, i.e. the acture sample function
       -- to update the inputTensor and targetTensor, put return it to
       -- the mainThread
-      tbatch:GetView('input'):forwardPut(self._input_shape, input)
-      tbatch:GetView('target'):forwardPut(self._output_shape, target)
+
+      tbatch:GetView('input'):forwardPut(_input_shape, input)
+      tbatch:GetView('target'):forwardPut(_output_shape, target)
       dataset:FillBatchOrderSample(tbatch, start, stop)
       return input, target
       -- the callback return one ore many values which will be 
@@ -214,15 +220,16 @@ function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)
       -- buffer
       local batch = self._send_batches:get()
       -- filling input data
-      batch:GetView('input'):forwardPut(self._input_shape, input)
-      batch:GetView('target'):forwardPut(self._output_shape, target)
+      batch:GetView('input'):forwardPut(_input_shape, input)
+      batch:GetView('target'):forwardPut(_output_shape, target)
       -- init call batch:setup and do preprocesses 
       callback(batch)
       batch:GetView('target'):setClasses(self._classes)
       self._recv_batches:put(batch)
    end
-
+   self.log.trace('add job to thread:')
    self._threads:addjob(worker_job, main_thread_job)
+   self.log.trace('add job success')
 end
 
 function VisualDataSet:AsyncAddRandomSampleJob(batch, batch_size, sample_func, callback)

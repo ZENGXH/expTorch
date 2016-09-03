@@ -83,7 +83,7 @@ function RandomSampler:sampleEpochAsync(dataset)
                 self.log.trace('batch is nil')
             end
 
-            local batch = dataset:InitBatchWithSize(batch_size)
+            local batch = dataset:InitBatchWithSize(uvbatchsize)
             local callback_func = function(batch)
                 -- metadata
                 batch:setup{

@@ -147,7 +147,7 @@ function View:view()
 end
 
 function View:SetViewStr(view)
-    assert(torch.isTypeOf(view, 'string'))
+    assert(torch.type(view) == 'string')
     self._view = view
     return self._view
 end

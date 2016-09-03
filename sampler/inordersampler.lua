@@ -41,7 +41,9 @@ function InorderSampler:sampleEpoch(dataset)
    -- function which can call as: sampler(batch)
    -- return batch, min(nSampled, epochSize), epochSize
    return function(batch)
+      
       if nSampled >= epochSize then
+         self.log.trace('nSample reach end')
          return
       end
       -- i.e. the last batch may have batch_size less than self._batch_size
@@ -59,16 +61,19 @@ function InorderSampler:sampleEpoch(dataset)
      if batch.IsBatch then 
           assert(batch.IsFilled()) -- must be filled whtn inited
       else
+         self.log.trace('\t InitBatchWithSize: ', self._batch_size)
          batch = dataset:InitBatchWithSize(self._batch_size)
       end
 
       -- batch in init already, calling sub will fill the data 
       -- into batch._inputs and batch._targets
       -- VisualDataSet:
+      self.log.trace('\t calling FillBatchOrderSample')
       dataset:FillBatchOrderSample(batch, self._start, stop_sampleid)
       
       -- get empty indices, reuse indices tensor for resetting
       -- metadata
+      self.log.trace('\t reset batch ')
       batch:reset{
          batch_iter = stop_sampleid, -- number of examples seen so far 
          batch_size = self._batch_size,
@@ -77,6 +82,7 @@ function InorderSampler:sampleEpoch(dataset)
          -- indices of the samples of batch in dataset 
       }
       -- data preprocesses, if no return batch 
+      self.log.trace('\t ppf batch')
       batch = self._ppf(batch)
 
       --[[ increment global self_start ]]--
@@ -89,12 +95,15 @@ function InorderSampler:sampleEpoch(dataset)
       local epoch_stop_idx = math.min(nSampled, epochSize)
       return batch, epoch_stop_idx, epochSize
    end
+
 end
 
 -- used with datasets that support asynchronous iterators like ImageClassSet
 -- return a function object, call by(batch, putOnly)
 function InorderSampler:sampleEpochAsync(dataset)
-    assert(dataset.isDataSet)
+    print('=============')
+   self.log.trace('requests iterator')
+   assert(dataset.isDataSet)
    -- dataset = dp.Sampler.toDataset(dataset)
    -- variable as control for multithreading
    local nSample = dataset:nSample()
@@ -107,6 +116,7 @@ function InorderSampler:sampleEpochAsync(dataset)
    local batch_size = self._batch_size
    local StartThreadSampleBatch = function()
        if nSampledGet >= epochSize then
+           self.log.trace('nSample reach end')
            -- do nothind is the Sampled Get intotal is enough for the epoch
            -- i.e. reach the end of the current epoch
            return 
@@ -125,6 +135,7 @@ function InorderSampler:sampleEpochAsync(dataset)
        local uvstart = self._start
        -- batch should be init in AsyncAddOrderSampleJob, #epoch_num batch will be inited then next epoch will reused them from buffer_batch
        -- local batch = dataset:InitBatchWithSize(batch_size)
+       self.log.trace('setup callback_func')
        local callback_func = function(batch)
            -- metadata
            batch:setup
@@ -135,10 +146,12 @@ function InorderSampler:sampleEpochAsync(dataset)
            batch = self._ppf(batch)
        end
        -- ImageClassSet:subAsyncPut(batch, start, stop, callback)   
+       self.log.trace('calling AsyncAddOrderSampleJob: ')
        dataset:AsyncAddOrderSampleJob(batch, self._start,
-        stop_sampleid, callback_func) 
+        stop_sampleid, callback_func)
+       self.log.trace('\t add job done')
        -- func subAsyncPut
-
+       self.log.trace('do global increment')
        nSampledPut = nSampledPut + stop_sampleid - self._start + 1
        --[[ increment self_start ]]--
        self._start = self._start + self._batch_size
@@ -150,10 +163,11 @@ function InorderSampler:sampleEpochAsync(dataset)
    --[[ build iterator ]]--
    local sampleBatch = function(batch)
       StartThreadSampleBatch()     
+      self.log.trace('call asyncGet: ')
       batch = dataset:asyncGet()
       nSampledGet = nSampledGet + self._batch_size
       self:collectgarbage() 
-      local epoch_stop_idx = math.min(nSampled, epochSize)
+      local epoch_stop_idx = math.min(nSampledGet, epochSize)
       return batch, epoch_stop_idx, epochSize
    end -- func samplerBatch
    ----------------------------------------------------------------------------

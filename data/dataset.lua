@@ -76,7 +76,7 @@ end
 ------------------------------------------------------------------
 function DataSet:SetOutputShape(output_shape)
     self.log.info('orignal shape in ', self._input_shape, ' out: ', self.output_shape)
-    self._output_shape = output_shape oe self._output_shape
+    self._output_shape = output_shape or self._output_shape
     self.log.info('changed into: shape in ', self._input_shape, ' out: ', self.output_shape)
 end
 
@@ -146,9 +146,11 @@ end
 function DataSet:index(batch, indices)
    if (not batch) or (not indices) then 
       indices = indices or batch
-    assert(torch.isTensor(indices))
-    local batch = self:CreateEmptyBatchIfNil(batch)
-    return self:FillBatchWithIndex(batch, indices)
+   end
+
+   assert(torch.isTensor(indices))
+   local batch = self:CreateEmptyBatchIfNil(batch)
+   return self:FillBatchWithIndex(batch, indices)
 end
 
 -- DEPRECATED

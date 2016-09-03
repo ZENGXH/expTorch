@@ -5,28 +5,18 @@ local log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
 -----------
 -- classID_file = /data1/wangjiang/datasets/ucf101_list/ClassID_ucf101.txt
 function ucf101_helper.ReadGTText2DataDict(
-        classID_file, video_list, 
-        classList, classes, classListVideo, classIndices,
-        videoList, videoIndices, videoLabel, videoLength, videoPath)
-    -- data_dict is wrap in 
-    -- data_dict 
-    --   'class_num': ...,
-    --   'data': { 1: {'title': ,, , 'length': ,. ,'label':..},}
-    
+        classID_file, video_list, classes, classIndices, videoIdClassId, videoIdVideoTitle, 
+        videoIdVideoPath, videoLength)
     assert(classID_file, 'classID_file not exist')
     assert(video_list, 'input_file not exist')
     local classID = io.open(classID_file, 'r')
     assert(classID ~= nil, classID_file..' broken')
-
     for class in classID:lines() do
         local index_class = #classes + 1
-        -- log.trace('push: ',index_class, class)
         classes[index_class] = class
         classIndices[class] = index_class
-        classListVideo[index_class] = {}
     end
     classID:close()
-
     -- get video infomation
     -- print(string.format('open %s to read', video_list))
     local file = io.open(video_list, 'r')
@@ -56,18 +46,15 @@ function ucf101_helper.ReadGTText2DataDict(
             i = i + 1
         end
         index_class = label + 1
-        data[line_id].label = w
+        data[line_id].label = label
         data[line_id].length = length
-        data[line_id].title = w
-        table.insert(videoList, title)
-        videoIndices[title] = index_video
-        videoLabel[title] = label
-        table.insert(videoPath, title..'.bin')
+        data[line_id].title = title
+        videoIdClassId[index_video] = index_class
+        videoIdVideoTitle[index_video] = title
+        videoIdVideoPath[index_video] = title..'.bin'
         table.insert(videoLength, length)
-        -- videoPath[title] = title..'bin'
-        table.insert(classListVideo[index_class], title)
+        line_id = line_id + 1 
     end
-
     data_dict.video_num = #data
     data_dict.data = data
     -- print('[ReadGTText2DataDict] done, max_length ', torch.Tensor(videoLength):max(), 
@@ -94,7 +81,8 @@ function ucf101_helper.MvFile(input_file, root, reduce_length, seg5_bin_path)
         concat.video = title
         concat.data = {}
         for frames_id = 0, length-1-reduce_length do
-            local file_name = string.format('%s/%s/%s_%d_1views.bin', root, seg5_bin_path, title, frames_id) -- start from start_point: -1; filaname start from 0: -1 
+            local file_name = string.format('%s/%s/%s_%d_1views.bin', root, seg5_bin_path, 
+            title, frames_id) -- start from start_point: -1; filaname start from 0: -1 
             -- print(file_name)
             -- local file_name = string.format('%s/%s_%d_1views.bin', video_path, title, frames_id) 
             data_load = ucf101_helper.LoadBinFile(file_name)
@@ -117,7 +105,6 @@ function ucf101_helper.LoadBinFile(filepath, datatype)
         shape[i] = a[1]
     end
     local total = shape[1] * shape[2] * shape[3] * shape[4]
-    
     local data
     if datatype == 'float' then
         data = file:readFloat(total)
@@ -127,11 +114,9 @@ function ucf101_helper.LoadBinFile(filepath, datatype)
     -- print('data', data)
     data = torch.FloatTensor(data)
     -- print('size of data: ', shape[1], shape[2], shape[3], shape[4])
-    
     file:close()
     return data -- return 1024 feature if seg5. 101 feature if prob
 end
-
 
 -- print('load ucf101_helper done')
 return ucf101_helper

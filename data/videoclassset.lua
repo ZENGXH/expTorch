@@ -27,7 +27,7 @@ local VideoClassSet, parent = torch.class("dp.VideoClassSet", "dp.VisualDataSet"
 -- batch, timeStep, channels, height, width
 VideoClassSet._input_shape = 'btchw' 
 VideoClassSet._output_shape = 'b'
-VideoClassSet.isVieoClassSet = true
+VideoClassSet.isVideoClassSet = true
 
 function VideoClassSet:__init(config)
     parent.__init(self, config)
@@ -54,7 +54,7 @@ function VideoClassSet:__init(config)
     'an image path. Stores them in dst. Strings "sampleDefault", '..
     '"sampleTrain" or "sampleTest" can also be provided as they '..
     'refer to existing functions'},
-    {arg='which_set', type='string', default='train',
+    {arg='which_set', type='string', req = true,
     help='"train", "valid" or "test" set'},
     {arg='frames_per_select', type='number', req=true,
     help='num of frames to be select'},
@@ -98,17 +98,18 @@ function VideoClassSet:__init(config)
     self.io_helper = args.io_helper 
     self.JoinTable = nn.JoinTable(1)
     
-    -- used for VideoClassSet:_TableToTensor(...)
-    self._input_view_type = 'dp.VideoView'
-    self._target_view_type = 'dp.ClassView'
-    self._input_shape_set = {self.frames_per_select, unpack(self.sample_size)}
+    -- used for VideoClassSet:_SubTableToTensor(...)
+    self._input_view_type = 'VideoView'
+    self._target_view_type = 'ClassView'
+    self._input_shape_set = {self.frames_per_select, unpack(self._sample_size)}
     self._target_shape_set = {batch_size}
     self._target_view_tensor = 'IntTensor'
     self._input_view_tensor = 'FloatTensor'
 
     assert(self.io_helper)
     -- indexing and caching
-    assert(_.find({'writeonce','overwrite','nocache','readonly'}, args.cache_mode), 'invalid cache_mode :'..args.cache_mode)
+    assert(_.find({'writeonce','overwrite','nocache','readonly'}, args.cache_mode), 
+        'invalid cache_mode :'..args.cache_mode)
 
     parent.__init(self, config)
     self.log.info('[videoclassset] _load_size:', self._load_size,
@@ -129,146 +130,71 @@ function VideoClassSet:__init(config)
             error"'readonly' cache_mode requires an existing cache, none found"
         end
         self.log.info('\t cacheExists, loadIndex')
-        self:loadIndex()
+        self:LoadIndex()
     else
-        self:buildIndex()
-        if cache_mode ~= 'nocache' then
-            self:saveIndex()
-        end
+        self:BuildIndex()
     end
-    self.list_video_index = torch.totable(torch.Tensor():range(1, self:GetNumOfVideo()))
+
+    self.log.info('building list_video_index for size: ', self:GetNumOfVideo())
+    self.list_video_index = torch.range(1, self:GetNumOfVideo())
+    self.is_shuffle = false
     -- required for multi-threading
-    self._config = args.config 
-     
+    self._config = config 
     self._class_set = 'VideoClassSet' 
     assert(self._input_shape == VideoClassSet._input_shape)
 end
 
-function VideoClassSet:saveIndex()
-    local index = {}
-    for i, k in ipairs{'classList', '_classes', '_classIndices', 'classListVideo', 'classListVideoIndices', 'classListFrameIndices', 'videoList', 'videoIndices', 'videoLength', 'videoPath'} do
-        index[k] = self[k]
-    end
-    torch.save(self._cache_path, index)
-    self.log.info(string.format('\t saveIndex checking #classList %d, #_classes %d, #_classIndices %d,'..
-            ' #classListVideo %d, #classListVideoIndices %d, #classListFrameIndices %d, '..
-            ' #videoList %d, #videoIndices %d, #videoLength %d, #videoPath %d', 
-            #index.classList, #index._classes, #index._classIndices,
-            #index.classListVideo, #index.classListVideoIndices, #index.classListFrameIndices,
-            #index.videoList, #index.videoIndices, #index.videoLength, #index.videoPath))
-    self.log.info('\t saveIndex in ', self._cache_path, ' after build')
+function VideoClassSet:SaveIndex(info)
+    self.log.info('[SaveIndex] in ', self._cache_path, ' after build')
+    torch.save(self._cache_path, info)
 end
 
-function VideoClassSet:loadIndex()
+function VideoClassSet:LoadIndex()
+    self.log.info('[loadIndex] from ', self._cache_path, ' after build')
     local index = torch.load(self._cache_path)
     for k, v in pairs(index) do
+        self.log.info('[loadIndex] ',k)
         self[k] = v
     end
-    self._n_sample = #self.videoPath
-    self.log.info('load index from '..self._cache_path..
-        ' done. get _n_sample ', self._n_sample)
-    self.log.info(string.format('\t loadIndex checking #classList %d, '..
-        '#_classes %d, #_classIndices %d,'..
-        ' #classListVideo %d, #classListVideoIndices %d, '..
-        '#classListFrameIndices %d, '..
-        ' #videoList %d, #videoIndices %d, #videoLength %d, #videoPath %d', 
-         #self.classList, #self._classes, #self._classIndices,
-         #self.classListVideo, #self.classListVideoIndices, 
-         #self.classListFrameIndices, #self.videoList, 
-         #self.videoIndices, #self.videoLength, #self.videoPath))
+    self._n_sample = #self.videoIdVideoPath
+    self._n_video = #self._classes
+    self._n_frame = torch.Tensor(self.videoLength):sum()
+    self.log.info(string.format('[VideoClassSet] BuildIndex done, get #samples %d, #video %d, #frames %d intotal', self._n_sample, self._n_video, self._n_frame))
     self._index_loaded = true
 end
-
-
-----------------------------------------------------------------------
--- index_class, index of class in classes table
--- classes, table of all class name
---      key: index_class, value: class name
--- classIndices, table pf index of class
---      key: class name, value: index_class
--- classListVideo, table of (table of video for each class), 
---      key: index_class, value: table of video titles
--- videoIndices, table of video's index in the videoList
---      key: title, value: index_class
--- videoList, table for all videos of from all class
---      key: index_class, value: title of video
--- videoPath, table of all videos' paths
---      key: index_video, value: path of video, can be the '.bin' file or the video folder
--- videoLength, table of length of all videos, key: title
---      key: title, value: length of the video
--- classListVideoIndices
---      key: index_class, value: torch.Tensor/length=num_video/contain index_video
--- videoClass: torch.Tensor 
---      key: index_video, value: index_class
 ------------------------------------------------------------------------
+-- classes: {k: index_class, v: class_name}
+-- classIndices: {k: class_name, v: index_class}
+-- videoList: {title1, title2}
+-- videoIdClassId: {k: index_video, v: index_class}
+-- videoIdVideoTitle: {k: index_video, v: title}
+-- videoIdVideoPath: {k: index_video, v: videopath}
+------------------------------------------------------------------------
+function VideoClassSet:BuildIndex()
+    info = {}
+    info._classes = {} 
+    info.classIndices = {}
+    info.videoIdClassId = {}
+    info.videoIdVideoTitle = {}
+    info.videoIdVideoPath = {} 
+    info.videoLength = {}
 
-function VideoClassSet:buildIndex()
-    -- loop over each paths folder, get list of unique class names, 
-    -- also store the directory paths per class
-    -- {'_videoes','_videoIndices', '_videolabel', 'imagePath','imageClass','classList','classListSampleTitle'} do
-    -- local classes = {} -- {'v_aas': true, 'cv_df': true, ...}
-    -- local classList = {} -- {'v_applysss', 'v_running', 'v_fdf'}
-    local classList = {} 
-    local classes = {}
-    local classListVideo = {}
-    local classIndices = {}
-    local videoList = {}
-    local videoIndices = {}
-    local videoLabel = {}
-    local videoLength = {}
-    local videoPath = {}
-    local data_dict = self.io_helper.ReadGTText2DataDict(
+    self.io_helper.ReadGTText2DataDict(
         self._classID_file, self._data_list, 
-        classList, classes, classListVideo, classIndices,
-        videoList, videoIndices, videoLabel, videoLength, videoPath)
-    self.classList = classList 
-    self._classes = classes
-    self._classIndices = classIndices
-    self.classListVideo = classListVideo
-    self.videoList = videoList
-    self.videoIndices = videoIndices
-    self.videoLength = videoLength
-    self.videoPath = videoPath
-    
-    local runningIndex = 0
-    self.videoClass = torch.Tensor(#self.videoList):fill(0)
-    self.classListVideoIndices = {}
-    for index_class = 1, #self._classes do
-        local num_video = #self.classListVideo[index_class]
-        if num_video == 0 then
-            error('Class has zero samples')
-        else
-            self.classListVideoIndices[index_class] = torch.linspace(
-            runningIndex+1, runningIndex+num_video, num_video)
-            self.videoClass[{{runningIndex + 1, runningIndex + num_video}}]:fill(index_class)
-        end
-        runningIndex = runningIndex + num_video
-    end
-    self.log.info('building classListVideoIndices done, get size ', runningIndex)
-    runningIndex = 0
-    self.classListFrameIndices = {}
-    self.framesClass = torch.Tensor():resize(torch.Tensor(self.videoLength):sum())
-    for index_video = 1, #self.videoList do
-        local num_frames = self.videoLength[index_video]
-        assert(num_frames >0)
-        self.classListFrameIndices[index_video] = torch.linspace(
-        runningIndex+1, runningIndex+num_frames, num_frames)
-        self.framesClass[{{runningIndex + 1, runningIndex + num_frames}}]:fill(self.videoClass[index_video])
-        runningIndex = runningIndex + num_frames
-    end
-    if self._verbose then
-        self.log.info("found " .. #self._classes .. " classes")
-    end
-    ---------------------------------------------------------------------
+        info._classes, info.classIndices, info.videoIdClassId, 
+        info.videoIdVideoTitle, info.videoIdVideoPath, info.videoLength)
+    self:SaveIndex(info)
+    self:LoadIndex() -- load into self
+
+    local lengthListTensor = torch.Tensor(self.videoLength)
+    self.log.info("found " .. #self._classes .. " classes")
+    self.log.info("#video: "..#self.videoIdVideoPath, ' min length = ', lengthListTensor:min())
+  ---------------------------------------------------------------------
     -- find the image path names
-    self._n_sample = #self.videoList
-    self._n_video = self.videoClass:size(1)
-    self._n_frame = self.framesClass:size(1)
-    ---------------------------------------------------------------------
+   ---------------------------------------------------------------------
     if self._verbose then
-        self.log.info('Updating classList and videoLabel appropriately')
+        self.log.info('Updating classes and videoLabel appropriately')
     end
-    self.log.info(string.format('[VideoClassSet] buildIndex done, get #samples %d, #video %d, #frames %d intotal', self._n_sample, self._n_video, self._n_frame))
     self._index_loaded = true
 end
 
@@ -278,13 +204,14 @@ end
 ------------------------------------------------------------------------
 
 function VideoClassSet:GetNumOfVideo()
-    assert(self._index_loaded, 'index not loaded')
-    return #self._index_video
+    assert(self._n_video)
+    return self._n_video
 end
 
 function VideoClassSet:Shuffle()
-    self.list_video_index = torch.totable(torch.Tensor():randperm(self:GetNumOfVideo()))
+    self.list_video_index = torch.Tensor():randperm(self:GetNumOfVideo())
     self.log.info('shuffle done')
+    self.is_shuffle = true
 end
 
 
@@ -325,6 +252,9 @@ function VideoClassSet:FillBatchOrderSample(tbatch, start, stop)
     local inputTable = {}
     local targetTable = {}       
     inputTable, targetTable = self:_GetOrderSample5D(start, stop, inputTable, targetTable)
+    print(start, stop, #inputTable)
+    assert(inputTable[1])
+        assert(inputTable[1][1]:size(1))
     return self:_FillBatch(tbatch, inputTable, targetTable)
 end
 
@@ -391,13 +321,17 @@ end
 -- @return inputTensor
 -- @return outputTensor
 ------------------------------------------------------------------
-function VideoClassSet:_TableToTensor(inputTable, targetTable, 
+function VideoClassSet:_SubTableToTensor(inputTable, targetTable, 
     inputTensor, targetTensor)
+    assert(inputTable and torch.type(inputTable) == 'table')
+    assert(targetTable and torch.type(targetTable) == 'table', targetTable)
     -- inputTensor possible shape: (t, c, h, w) or (t, c) or (1, c, h, w) or (1, c) or (c) or (c, h, w)
     -- inputTensor = torch.FloatTensor()
     -- targetTensor = targetTensor or torch.IntTensor()
+    self.log.trace('size of inputTensor ', dp.helper.PrintSize(inputTensor), 
+        ' and inputTable[1][1] ', dp.helper.PrintSize(inputTable[1]))
     assert(inputTensor and 
-    inputTensor:size():eq(inputTable[1][1]:size()), 'shape mis match')
+    inputTensor[1]:isSameSizeAs(inputTable[1]), 'shape mis match')
 
     assert(targetTensor and targetTensor:dim() == 1)
     assert(inputTensor:size(1) == #inputTable, 'requrie batch first')
@@ -407,7 +341,7 @@ function VideoClassSet:_TableToTensor(inputTable, targetTable,
     for i = 1, num_sample do
         targetTensor[i] = targetTable[i]
     end
-    self.log.trace('_TableToTensor return: size ', 
+    self.log.trace('_SubTableToTensor return: size ', 
         dp.helper.PrintSize(inputTensor))
     return inputTensor, targetTensor
 end
@@ -415,13 +349,13 @@ end
 ------------------------------------------------------------------
 -- copy the selected data in the inputTable into tBatch tensor
 ------------------------------------------------------------------
-function VideoClassSet:_FillBatch(tbatch, inputSubTable, targetTable)
-    assert(batch:IsFilled())
+function VideoClassSet:_FillBatch(tbatch, inputSubTable, targetSubTable)
+    assert(tbatch:IsFilled())
     local inputTensor = tbatch:GetView('input'):GetInputTensor()
     local targetTensor = tbatch:GetView('target'):GetInputTensor()
     assert(tbatch:GetView('input'):IsBatchFirst() and tbatch:GetView('target'):IsBatchFirst())
     -- need helper
-    inputTensor, targetTensor = self:_SubTableToTensor(inputTable, 
+    inputTensor, targetTensor = self:_SubTableToTensor(inputSubTable, 
         targetSubTable, inputTensor, targetTensor)
     -- assert(inputTensor:size(2) == 3)
     -- batch:SetView('input', dp.VideoView
@@ -451,15 +385,15 @@ function VideoClassSet:_GetRandomSample(nSample, inputTable, targetTable)
         -- sample class(label)
         local index_class = torch.random(1, #self._classes)
         self.log.trace('select index_class ', index_class, 
-            ' has video: ', #self.classListVideo[index_class])
+            ' has video: ', #self.classIndexVideoTableList[index_class])
         -- sample video from class
         local index_in_class_ran = torch.random(1, 
-            #self.classListVideo[index_class])
-        local index_video = self.classListVideoIndices[
+            #self.classIndexVideoTableList[index_class])
+        local index_video = self.classIndexVideoTableListIndices[
             index_class][index_in_class_ran]
         self.log.trace('select index_in_class_ran ', index_in_class_ran, 
             ' index_video: ', index_video)    
-        local videoPath = self.videoPath[index_video]
+        local videoPath = self.videoIdVideoPath[index_video]
         self.log.trace('get videopath: ', videoPath)
         local dst = self:GetImageBuffer(i)
         dst = self:LoadData5DRandomFunc(self, dst, videoPath) 
@@ -483,20 +417,23 @@ end
 -----------------------------------------------------------------
 function VideoClassSet:_GetOrderSample5D(start, stop, 
     inputTable, targetTable)
-  for i = 1, start - stop + 1 do
+  self.log.trace('GetOrdersampling iter ')
+  for i = 1, stop - start+ 1 do
+        self.log.trace('inserting')
         -- sample video from class
         -- local index_in_class_ran = torch.random(1, 
         local index_video = self.list_video_index[i]
-        local index_class = self.videoClass[index_video]
-        local videoPath = self.videoPath[index_video]
+        local index_class = self.videoIdClassId[index_video]
+        local videoPath = self.videoIdVideoPath[index_video]
         self.log.trace('select index_class ', index_class, 
             ' index_video: ', index_video, 'get videopath: ', videoPath)
-        local dst = self:GetImageBuffer(i):view(1, frames_per_select, unpack(self._sample_size))
-        dst = self:LoadData5DRandomCropFunc(self, dst, videoPath) 
+        local dst = self:GetImageBuffer(i):view(1, self.frames_per_select, unpack(self._sample_size))
+        dst = self:_LoadData5DRandomCropFunc(videoPath, dst) 
         -- enlarge size from 4d to 5d
         table.insert(inputTable, dst)
         table.insert(targetTable, index_class)  
     end
+    self.log.trace('return table size ', #inputTable)
     return inputTable, targetTable
 end
 
@@ -504,36 +441,6 @@ function VideoClassSet:GetImageBuffer(i)
    self._imgBuffers[i] = self._imgBuffers[i] or torch.FloatTensor():resize(1, self.frames_per_select, unpack(self._sample_size))
    return self._imgBuffers[i]
 end
-
-------------------------------------------------------
--- load the data from path into tensor
--- ByDefault load the whole videoPath
---
--- @param dst, torch.Tensor()
--- @param videoPath, dataPath of the data
--- 
--- @return data torch.Tensor
------------------------------------------------------
--- return a table contain all frames of the video 
-function VideoClassSet:loadVideo(path)
-    local video_path = paths.concat(self._data_path[1], path)
-    self.log.trace('[loadVideo] ', video_path)
-    local concat = torch.load(video_path)
-    local data = concat.data
-    return data
-end
-
-function VideoClassSet:LoadData(videoPath) 
-    -- enlarge size from 4d to 5d
-    -- #TODO: checking?
-    return input = self:loadVideo(path)
-    -- return input
-end
-
-function VideoClassSet:loadImage(path)
-    return self:loadVideo(path)
-end
-
 ------------------------------------------------------------------------
 -- return torch.Tensor in 5D(1, self.frames_per_select,
 --  unpack(self_sample_size)
@@ -547,9 +454,14 @@ end
 -- @return dst in 5D view: torch.Tensor
 -----------------------------------------------------------------------
 function VideoClassSet:_LoadData5DRandomCropFunc(path, dst)
+    self.log.trace('receive path ', path, self._data_path[1])
     assert(self.frames_per_select, 'frames_per_select must be set!')
-    local out = self:LoadDataDefaultFunc(path)
+    local video_path = paths.concat(self._data_path[1], path)
+    self.log.trace('[loadVideo] ', video_path)
+    local out = torch.load(video_path).data
     local num_frames = #out
+    assert(num_frames >= self.frames_per_select, 'get num_frames '..num_frames..
+        ' and select '..self.frames_per_select)
     local index_start_ran = torch.random(1, num_frames-self.frames_per_select+1)
     local i = 1
     local copy_end = index_start_ran + self.frames_per_select - 1
@@ -586,15 +498,15 @@ function VideoClassSet:LoadData5DRangeFunc(path, start, stop, dst)
 end
 
 -----------------------------------------------------------------------
--- Given video Data table, narrow it by start and end, return as a 5D Tensor
+-- Given video Data table, narrow it by index_start and end, return as a 5D Tensor
 -- @param out: table, {Tensor in 1D: 1024..}
--- @param start: int
--- @param copy_end: int, copy_end - start + 1 may < self.frames_per_select
+-- @param index_start: int
+-- @param copy_end: int, copy_end - index_start + 1 may < self.frames_per_select
 -- @param dst: output Tensor
 --
 -- @return dst 
 ------------------------------------------------------------------------
-function VideoClassSet:_NarrowOutputTableToDst(out, start, copy_end, dst)
+function VideoClassSet:_NarrowOutputTableToDst(out, index_start, copy_end, dst)
     dst = dst:resize(self.frames_per_select, unpack(self._sample_size)):fill(0)
     local narrowTable = nn.NarrowTable(index_start, 
         copy_end - index_start + 1) -- offset, length
@@ -610,3 +522,37 @@ function VideoClassSet:_NarrowOutputTableToDst(out, start, copy_end, dst)
     -- add first dim 1, prepare for join to be a batch
     return dst:view(1, self.frames_per_select, unpack(self._sample_size)) -- 5D
 end
+
+------------------------------------------------------
+-- load the data from path into tensor
+-- ByDefault load the whole videoPath
+--
+-- @param dst, torch.Tensor()
+-- @param videoPath, dataPath of the data
+-- 
+-- @return data torch.Tensor
+-----------------------------------------------------
+-- return a table contain all frames of the video 
+function VideoClassSet:loadVideo(path)
+    self.log.fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
+    local video_path = paths.concat(self._data_path[1], path)
+    self.log.trace('[loadVideo] ', video_path)
+    local concat = torch.load(video_path)
+    local data = concat.data
+    return data
+end
+
+function VideoClassSet:LoadData(videoPath) 
+    self.log.fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
+    -- enlarge size from 4d to 5d
+    -- #TODO: checking?
+    return self:loadVideo(path)
+    -- return input
+end
+
+function VideoClassSet:loadImage(path)
+    self.log.fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
+    return self:loadVideo(path)
+end
+
+

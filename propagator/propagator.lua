@@ -84,7 +84,8 @@ function Propagator:setup(config)
    self._mediator = args.mediator
    self:model(args.model)
    self._target_module = args.target_module or nn.Identity()
-   self._sampler:setup{mediator=mediator, model=model}
+   self._sampler:SetMediator(mediator)
+   -- self._sampler:setup{mediator=mediator, model=model}
    
    if self._observer then 
        self._observer:setup{mediator=mediator, subject=self} 
@@ -107,8 +108,10 @@ end
 -- pass model and report to self._epoch_callback()
 -- call propagateBatch recurrently
 function Propagator:propagateEpoch(dataset, report)
+   self.log.trace('propagating: ')
    self.sumErr = 0
    if self._feedback then
+      self.log.trace('reset feedback ')
       self._feedback:reset()
    end
    
@@ -117,29 +120,36 @@ function Propagator:propagateEpoch(dataset, report)
    local batch, i, n, last_n
    local n_batch = 0
    
-   if self._stats and self._verbose then
+   if self._stats then
       print('==> epoch # '..(report.epoch + 1)..' for '..self:name()..' :')
    end
    
    if self._model.forget then
+       self.log.trace('calling forget')
       -- for recurrent modules, forget between epochs
       self._model:forget()
    end
    
+   self.log.trace('calling epoch callback')
    self._epoch_callback(self._model, report)
    
    self._n_sample = 0
 
    -- create an sampler object in class Sampler
+
+   self.log.trace('set up sampler interator: ')
    local sampler = self._sampler:sampleEpoch(dataset)
    
+   self.log.trace('set up done')
    while true do
       -- reuse the batch object
       -- if not exist then sampler(batch) will create one
       if batch then
          assert(torch.type(batch) == 'dp.Batch')
       end
+      self.log.trace('sampling batch')
       batch, i, n = sampler(batch)
+
       if not batch then -- fail?
          -- for aesthetics :
          if self._progress then
@@ -149,6 +159,7 @@ function Propagator:propagateEpoch(dataset, report)
       end
       
       self.nSample = i -- == min(nSampled, epochSize)
+      self.log.trace('call propagateBatch')
       self:propagateBatch(batch, report)
       
       if self._progress then

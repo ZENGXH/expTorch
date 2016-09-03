@@ -7,11 +7,11 @@
 -- scale up to 14 million+ images)
 -- images on disk can have different height, width and number of channels.
 ------------------------------------------------------------------------
-local ImageClassSet, parent = torch.class("dp.ImageClassSet", "dp.VisualDataSet")
+local ImageClassSet, parent = torch.class("dp.ImageClassSet", "dp.DataSet")
+
 ImageClassSet._input_shape = 'bchw'
 ImageClassSet._output_shape = 'b'
 ImageClassSet.isImageClassSet = true
-
 function ImageClassSet:__init(config)
    parent.__init(self, config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
@@ -68,15 +68,7 @@ function ImageClassSet:__init(config)
    assert(_.find({'writeonce','overwrite','nocache','readonly'}, self._cache_mode), 'invalid cache_mode :'..self._cache_mode)
 
    local cacheExists = paths.filep(self._cache_path)
-       -- used for VisualDataSet:tableToTensor(...)
-    self._input_view_type='dp.ImageView'
-    self._target_view_type='dp.ClassView'
-    self._input_shape_set = self.sample_size
-    self._target_shape_set = {}
-    self._target_view_tensor = 'IntTensor'
-    self._input_view_tensor = 'FloatTensor'
-
-
+   
     self.log.info(' cache_mode: ', args.cache_mode)
    if args.cache_mode == 'readonly' or (args.cache_mode == 'writeonce' and args.cacheExists) then
       if not cacheExists then
@@ -89,6 +81,8 @@ function ImageClassSet:__init(config)
          self:saveIndex()
       end
    end
+   -- buffers
+   self._imgBuffers = {}
    
    -- required for multi-threading
    self._config = config 
@@ -102,7 +96,13 @@ function ImageClassSet:saveIndex()
    torch.save(self._cache_path, index)
 end
 
--- function ImageClassSet:loadIndex()
+function ImageClassSet:loadIndex()
+   local index = torch.load(self._cache_path)
+   for k, v in pairs(index) do
+      self[k] = v
+   end
+   self._n_sample = self.imagePath:size(1)
+end
 
 ------
 -- classIndices: table
@@ -157,7 +157,9 @@ function ImageClassSet:buildIndex()
    if self._verbose then
       print("found " .. #self._classes .. " classes")
    end
+   
    self._classIndices = classIndices
+   
    -- define command-line tools, try your best to maintain OSX compatibility
    local wc = 'wc'
    local cut = 'cut'
@@ -167,6 +169,7 @@ function ImageClassSet:buildIndex()
       cut = 'gcut'
       find = 'gfind'
    end
+   
    ---------------------------------------------------------------------
    -- Options for the GNU find command
    local extensionList = {'jpg', 'png','JPG','PNG','JPEG', 'ppm', 'PPM', 'bmp', 'BMP'}
@@ -174,6 +177,7 @@ function ImageClassSet:buildIndex()
    for i=2, #extensionList do
       findOptions = findOptions .. ' -o -iname "*.' .. extensionList[i] .. '"'
    end
+
    -- find the image path names
    self.imagePath = torch.CharTensor()  -- path to each image in dataset
    self.imageClass = torch.LongTensor() -- class index of each image (class index in self._classes)
@@ -268,7 +272,7 @@ function ImageClassSet:buildIndex()
          self.imageClass[{{runningIndex + 1, runningIndex + length}}]:fill(i)
       end
       runningIndex = runningIndex + length
-end
+   end
 
    ----------------------------------------------------------------------
    -- clean up temporary files
@@ -286,27 +290,41 @@ end
    os.execute('rm -f '  .. tmpfilelistall)
    os.execute('rm -f "' .. combinedFindList .. '"')
 end
-    
-function ImageClassSet:loadIndex()
-   local index = torch.load(self._cache_path)
-   for k, v in pairs(index) do
-      self[k] = v
-   end
-   self._n_sample = self.imagePath:size(1)
+
+function ImageClassSet:batch(batch_size)
+   self.log.tracefrom('request batch with size ', batch_size)
+   return dp.Batch{
+      which_set=self._which_set,
+      inputs=dp.ImageView('bchw', 
+        torch.FloatTensor(batch_size, unpack(self._sample_size))),
+      targets=dp.ClassView('b', 
+        torch.IntTensor(batch_size))
+   }
 end
 
--------------------------------------------------------------
--- fill the batch with data from start to stop, 
--- reuse the batch if given
--- @param batch: dp.Batch [optional]
--- @param start: int
--- @param stop: int 
---
--- @return batch
--------------------------------------------------------------
-function ImageClassSet:FillBatchOrderSample(batch, start, stop)
-   assert(batch.isBatch and batch.IsFilled(),  'FillBatch require batch set and init')
-   -- init a batch nil
+-- nSample(), nSample(class)
+function ImageClassSet:nSample(class, list)
+   list = list or self.classList
+   if not class then
+      return self._n_sample
+   elseif type(class) == 'string' then
+      return list[self._classIndices[class]]:size(1)
+   elseif type(class) == 'number' then
+      return list[class]:size(1)
+   end
+end
+
+function ImageClassSet:sub(batch, start, stop)
+   if not stop then
+      stop = start
+      start = batch
+      batch = nil
+   end
+   -- inie a batch nil
+   batch = batch or dp.Batch{
+        which_set=self:whichSet(), 
+        epoch_size=self:nSample()
+        }
    -- convert [string] self._sample_func to [function] sampleFunc
    local sampleFunc = self._sample_func
    if torch.type(sampleFunc) == 'string' then
@@ -350,10 +368,12 @@ function ImageClassSet:index(batch, indices)
    end
    batch = batch or dp.Batch{which_set=self:whichSet(), 
         epoch_size=self:nSample()}
+
    local sampleFunc = self._sample_func
    if torch.type(sampleFunc) == 'string' then
       sampleFunc = self[sampleFunc]
    end
+
    local inputTable = {}
    local targetTable = {}
    for i = 1, indices:size(1) do
@@ -419,13 +439,14 @@ function ImageClassSet:loadImage(path)
    return input
 end
 
+function ImageClassSet:getImageBuffer(i)
+   self._imgBuffers[i] = self._imgBuffers[i] or torch.FloatTensor()
+   return self._imgBuffers[i]
+end
 
----------------------------------------------------------
 -- Sample a class uniformly, and then uniformly samples example from class.
 -- This keeps the class distribution balanced.
---
--- @oaram batch: 
--- @param sampleFunc: func, a function that generates one or many samples
+-- sampleFunc is a function that generates one or many samples
 -- from one image. e.g. sampleDefault, sampleTrain, sampleTest.
 function ImageClassSet:sample(batch, nSample, sampleFunc)
    if (not batch) or (not sampleFunc) then 
@@ -434,9 +455,7 @@ function ImageClassSet:sample(batch, nSample, sampleFunc)
          nSample = batch
          batch = nil
       end
-      batch = batch or dp.Batch{
-                    which_set=self:whichSet(), 
-                    epoch_size=self:nSample()}   
+      batch = batch or dp.Batch{which_set=self:whichSet(), epoch_size=self:nSample()}   
    end
    
    sampleFunc = sampleFunc or self._sample_func
@@ -447,7 +466,7 @@ function ImageClassSet:sample(batch, nSample, sampleFunc)
    nSample = nSample or 1
    local inputTable = {}
    local targetTable = {}   
-   for i=1, nSample do
+   for i=1,nSample do
       -- sample class
       local class = torch.random(1, #self._classes)
       -- sample image from class
@@ -562,26 +581,118 @@ function ImageClassSet:sampleTest(dst, path)
    return dst
 end
 
+function ImageClassSet:classes()
+   return self._classes
+end
 ------------------------ multithreading --------------------------------
 
--------------------------------------------------------------------
--- put #nThread sampling job for each thread
--- decide how to get the index of video (sampling)
--- and select which part of the video
---
--- @param batch: filled batch
--- @param nSample, batch_size
--- @param sampleFunc: func
--- @param callback: which to do after get from the sampling
---
------------------------------------------------------------------
+function ImageClassSet:multithread(nThread)
+   local nThread = nThread or 2
+   if not paths.filep(self._cache_path) then
+      -- workers will read a serialized index to speed things up
+      self:saveIndex()
+   end
+   
+   local mainSeed = os.time()
+   local config = self._config
+   config.cache_mode = 'readonly'
+   config.verbose = self._verbose
+   
+   local threads = require "threads"
+   threads.Threads.serialization('threads.sharedserialize')
+   self.log.info('init threads with dataset: ', self._class_set)
+   self._threads = threads.Threads(
+      nThread,
+      -- all function below will be executed in all thread
+      function() -- make a separated f1 containing all the definitions 
+        print('threading')
+        require 'dprnn.dprnn'
+      end,
+    
+      function(idx) -- other code in f2
+         opt = options -- pass to all donkeys via upvalue
+         tid = idx
+         local seed = mainSeed + idx
+         math.randomseed(seed)
+         torch.manualSeed(seed)
+         if config.verbose then
+            print(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
+         end
+         dataset = dp[self._class_set](config)
+
+         tbatch = dataset:batch(1)
+      end
+   )
+   
+   self._send_batches = dp.Queue() -- batches sent from main to threads
+   self._recv_batches = dp.Queue() -- batches received in main from threads
+   self._buffer_batches = dp.Queue() -- buffered batches
+   
+   -- public variables
+   self.nThread = nThread
+   self.isAsync = true
+end
+
+-- pull batches from self._recv_batches and push to _buffer_batches
+function ImageClassSet:synchronize()
+   self._threads:synchronize()
+   while not self._recv_batches:empty() do
+     self._buffer_batches:put(self._recv_batches:get())
+   end
+end
+
+-- send request to worker : put request into queue
+-- create a batch with batch_size (stop-start+1)
+-- put into self._send_batches
+-- add thread job, in which :sub is call in data-worker thread
+-- main-thread get batch from ._send_batches and put into _recv_batches
+function ImageClassSet:subAsyncPut(batch, start, stop, callback)   
+   if not batch then
+      -- get a batch from _buffer_batches or create a new batch
+      -- and pre-filled the [dataView] input abd target
+      batch = (not self._buffer_batches:empty()) and self._buffer_batches:get() or self:batch(stop-start+1)
+   end
+
+   local input = batch:inputs():input()
+   local target = batch:targets():input()
+   
+   assert(batch:inputs():input() and batch:targets():input())
+   
+   self._send_batches:put(batch)
+   
+   self._threads:addjob(
+      -- the job callback (runs in data-worker thread)
+      function()
+         tbatch:inputs():forward(self._input_shape, input)
+         tbatch:targets():forward(self._output_shape, target)
+         dataset:sub(tbatch, start, stop)
+         return input, target
+         -- the callback return one ore many values which will be 
+         -- serialized and unserialized as arguments to the endcallback function. 
+      end,
+
+      -- the endcallback (runs in the main thread)
+      function(input, target)
+         local batch = self._send_batches:get()
+         -- filling input data
+         batch:inputs():forward(self._input_shape, input)
+         batch:targets():forward(self._output_shape, target)
+         -- init call batch:setup and do preprocesses 
+         callback(batch)
+         
+         batch:targets():setClasses(self._classes)
+         self._recv_batches:put(batch)
+      end
+   )
+end
+
 function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
    self.log.info('[sampleAsyncPut] with view in ', self._input_shape, ' for nSample ', nSample)
    self._iter_mode = self._iter_mode or 'sample'
    if (self._iter_mode ~= 'sample') then
       error'can only use one Sampler per async ImageClassSet (for now)'
    end  
-  --[[ 
+   
    if not batch or batch == nil then
       self.log.trace('batch is nil size of buffer_batches: ', self._buffer_batches:length() )
       batch = (not self._buffer_batches:empty()) and self._buffer_batches:get() or self:batch(nSample)
@@ -589,10 +700,11 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
    else
        self.log.trace('batch is nil')
    end
-   ]]--
 
-   local input = batch:GetView('input'):GetInputTensor()
-   local target = batch:GetView('target'):GetInputTensor()
+   local input = batch:inputs():input()
+   local target = batch:targets():input()
+   assert(input:dim() == 4)
+   assert(target)
    
    local p = torch.pointer(input:storage()) 
    -- transfer the storage pointer over to a thread
@@ -611,20 +723,22 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
    self.log.trace('put batch')
    assert(self._threads:acceptsjob())
    self.log.trace('start add job')
-   local view_str = 'bchw'
    self._threads:addjob(
       -- the job callback (runs in data-worker thread)
       function()
          -- set the transfered storage
-         -- put the inputTensor into tbatch in current thread         
+         
          print('setStorage')
          torch.setFloatStorage(input, inputPointer)
          torch.setIntStorage(target, targetPointer)
-         tbatch:GetView('input'):ward(view_str, input)
-         tbatch:GetView('targets'):forward('b', target)
+         local view =  'btchw'
+         
+         tbatch:inputs():forward(view, input)
+         tbatch:targets():forward('b', target)
+
          print('forward')
          
-         dataset:FillBatchRandomSample(tbatch, nSample, sampleFunc)
+         dataset:sample(tbatch, nSample, sampleFunc)
          assert(tbatch:inputs():input()) 
          assert(tbatch:targets():input()) 
          -- transfer it back to the main thread
@@ -644,7 +758,6 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
          local batch = self._send_batches:get()
          torch.setFloatStorage(input, istg)
          torch.setIntStorage(target, tstg)
-         
          batch:inputs():forward('btchw', input)
          batch:targets():forward('b', target)
          callback(batch)
@@ -656,3 +769,12 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
    )
 end
 
+-- recv results from worker : get results from queue
+function ImageClassSet:asyncGet()
+   -- necessary because Threads:addjob sometimes calls dojob...
+   self.log.info('asyncGet is called')
+   if self._recv_batches:empty() then
+      self._threads:dojob()
+   end
+   return self._recv_batches:get()
+end
