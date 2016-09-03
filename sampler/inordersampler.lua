@@ -104,7 +104,7 @@ function InorderSampler:sampleEpochAsync(dataset)
    local nSampledPut = 0
    local nSampledGet = 0
    local stop_sampleid
-
+   local batch_size = self._batch_size
    local StartThreadSampleBatch = function()
        if nSampledGet >= epochSize then
            -- do nothind is the Sampled Get intotal is enough for the epoch
@@ -123,7 +123,8 @@ function InorderSampler:sampleEpochAsync(dataset)
        local uvstop_sampleid = stop_sampleid -- make it local 
        local uvbatchsize = self._batch_size
        local uvstart = self._start
-       local batch = dataset:InitBatchWithSize(batch_size)
+       -- batch should be init in AsyncAddOrderSampleJob, #epoch_num batch will be inited then next epoch will reused them from buffer_batch
+       -- local batch = dataset:InitBatchWithSize(batch_size)
        local callback_func = function(batch)
            -- metadata
            batch:setup
@@ -145,7 +146,7 @@ function InorderSampler:sampleEpochAsync(dataset)
            self._start = 1
        end
    end      
- 
+   ----------------------------------------------------------------------------
    --[[ build iterator ]]--
    local sampleBatch = function(batch)
       StartThreadSampleBatch()     
@@ -155,9 +156,11 @@ function InorderSampler:sampleEpochAsync(dataset)
       local epoch_stop_idx = math.min(nSampled, epochSize)
       return batch, epoch_stop_idx, epochSize
    end -- func samplerBatch
+   ----------------------------------------------------------------------------
 
    assert(dataset.isAsync, "expecting asynchronous dataset")
    -- empty the async queue
+   -- pull all batch from _recv_batches input buffer_batch
    dataset:synchronize()
    -- fill task queue with some batch requests
    -- the first time call sampleEpochAsync, start 'putOnly' sampleBatch for #nThread times
