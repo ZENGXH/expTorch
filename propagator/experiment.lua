@@ -53,6 +53,8 @@ function Experiment:__init(config)
    )
    self:randomSeed(random_seed)
    self:id(id or dp.ObjectID(dp.uniqueID()))
+   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log.SetLoggerName('exp')
    self:model(model)
    self:epoch(epoch)
    self:observer(observer)
@@ -168,15 +170,19 @@ function Experiment:name()
 end
 
 function Experiment:model(model)
+   self.log.info('get model: ', model)
    if model then
-      assert(torch.isTypeOf(model, 'nn.Module'), "Expecting nn.Module instance")
-      if not torch.isTypeOf(model, 'nn.Serial') then
+       assert(torch.isTypeOf(model, 'nn.Module'), 
+        "Expecting nn.Module instance")
+       self._model = model
+--[[
+       if not torch.isTypeOf(model, 'nn.Serial') then
          self._model = nn.Serial(model)
          self._model:mediumSerial(false)
       else
          self._model = model
       end
-      return
+]]--
    end
    return self._model
 end
