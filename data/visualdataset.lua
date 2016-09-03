@@ -48,11 +48,10 @@ end
 -- @return: batchsize inited wich 
 ------------------------------------------------------------------------
 function VisualDataSet:InitBatchWithSize(batch_size)
+   self.log.tracefrom('request batch with size ', batch_size, ' sample_size(input) ', unpack(self._input_shape_set))
    assert(torch.type(batch_size) == 'number' and batch_size > 0)
    local batch = self:CreateEmptyBatchIfNil()
    assert(batch.isBatch and not batch:IsFilled())
-   self.log.tracefrom('request batch with size ', batch_size, 
-   ' sample_size(input) ', unpack(self._input_shape_set))
    batch:SetView('input', dp[self._input_view_type](self._input_shape, 
    torch[self._input_view_tensor](batch_size, unpack(self._input_shape_set))))
    if 0 == #self._target_shape_set then
@@ -184,11 +183,12 @@ end
 -- @param callback
 ------------------------------------------------------------------------
 function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)   
-   if not batch or (batch and batch,isBatch and batch.IsFilled()) then
+   if not batch or (batch and batch.isBatch and batch.IsFilled()) then
       -- buffer_batches are filled in :synchronize() by batch in _recv_batches
-      batch = (not self._buffer_batches:empty() and self._buffer_batches:get()) or self:InitBatchWithSize(self._batch_size)
+      local batch_size_cur = stop - start + 1
+      batch = (not self._buffer_batches:empty() and self._buffer_batches:get()) or self:InitBatchWithSize(batch_size_cur)
    end
-   assert(batch.isBatch and batch.IsFilled())
+   assert(batch.isBatch and batch:IsFilled())
    local input = batch:GetView('input'):GetInputTensor()
    local target = batch:GetView('target'):GetInputTensor()
    assert(input and target) 
