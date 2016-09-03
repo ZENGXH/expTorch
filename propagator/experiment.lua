@@ -296,7 +296,7 @@ function Experiment:silent()
 end
 
 function Experiment:type(new_type)
-    self._model:mediumSerial(false)
+    -- self._model:mediumSerial(false)
     if self._model then
         self._model:type(new_type)
     end
