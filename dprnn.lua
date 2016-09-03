@@ -1,3 +1,7 @@
+require 'nn'
+require 'nngraph'
+require 'optim'
+require 'lfs'
 
 require 'nnx'
 require 'dpnn'

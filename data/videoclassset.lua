@@ -252,7 +252,7 @@ function VideoClassSet:FillBatchOrderSample(tbatch, start, stop)
     local inputTable = {}
     local targetTable = {}       
     inputTable, targetTable = self:_GetOrderSample5D(start, stop, inputTable, targetTable)
-    print(start, stop, #inputTable)
+    -- print(start, stop, #inputTable)
     assert(inputTable[1])
         assert(inputTable[1][1]:size(1))
     return self:_FillBatch(tbatch, inputTable, targetTable)

@@ -312,7 +312,7 @@ end
 -- recv results from worker : get results from queue
 function VisualDataSet:asyncGet()
    -- necessary because Threads:addjob sometimes calls dojob...
-   self.log.info('asyncGet is called')
+   self.log.trace('asyncGet is called')
    if self._recv_batches:empty() then
       self._threads:dojob()
    end
