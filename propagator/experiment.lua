@@ -181,14 +181,14 @@ function Experiment:model(model)
         assert(torch.isTypeOf(model, 'nn.Module'), 
         "Expecting nn.Module instance")
         self._model = model
-        --[[
+        
         if not torch.isTypeOf(model, 'nn.Serial') then
         self._model = nn.Serial(model)
         self._model:mediumSerial(false)
         else
         self._model = model
         end
-        ]]--
+        
     end
     return self._model
 end
@@ -296,7 +296,7 @@ function Experiment:silent()
 end
 
 function Experiment:type(new_type)
-    -- self._model:mediumSerial(false)
+    self._model:mediumSerial(false)
     if self._model then
         self._model:type(new_type)
     end
