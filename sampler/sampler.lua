@@ -64,7 +64,7 @@ function Sampler:__init(config)
    )
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
-
+   self.cuda = false
    self._ppf = args.ppf or function(batch) 
         return batch 
     end
@@ -150,12 +150,17 @@ end
 function Sampler:collectgarbage()
    self._gc_n_batch = self._gc_n_batch + 1
    if self._gc_n_batch >= self._gc_freq then
-      --http://bitsquid.blogspot.ca/2011/08/fixing-memory-issues-in-lua.html
+   --http://bitsquid.blogspot.ca/2011/08/fixing-memory-issues-in-lua.html
       collectgarbage()
       self._gc_n_batch = 0
    end
 end
-
+-----------------------------------------------------------------
+-- type conversion for cuda
+function Sampler:SetCuda()
+    self.log.info('\t setCuda')
+    self.cuda = true
+end
 
 -- change normal sampleEpoch to sampleEpochAsync
 function Sampler:async()
@@ -172,6 +177,7 @@ function Sampler:setBatchSize(batch_size)
    self.log.fatal('depreciated')
    return self:ResetBatchSize(batch_size)
 end
+
 function Sampler:batchSize()
    self.log.fatal('depreciated')
    return self:GetBatchSize()

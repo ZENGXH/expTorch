@@ -119,24 +119,29 @@ function Experiment:run(datasource, once)
     local atleastonce = false
     repeat
         self._epoch = self._epoch + 1
+        self.log.info('start epoch: ', self._epoch)
         if self._optimizer and train_set then
             self.log.info('optimizer propagateEpoch..')
             self._optimizer:propagateEpoch(train_set, report)
+            self.log.info('optimizer propagateEpoch done')
         end
         if self._validator and valid_set then
             self.log.info('validator propagateEpoch..')
             self._validator:propagateEpoch(valid_set, report)
+            self.log.info('validator propagateEpoch done')
         end
         if self._tester and test_set then
             self.log.info('tester propagateEpoch..')
             self._tester:propagateEpoch(test_set, report)
+            self.log.info('tester propagateEpoch done')
         end
-
+        self.log.info('collecting report')
         report = self:report()
 
         self._mediator:publish("doneEpoch", report)
         atleastonce = true
     until (self:isDoneExperiment() or self._epoch >= self._max_epoch or (once and atleastonce))
+    self.log.info('finish all epoch')
     self._mediator:publish("finalizeExperiment")
 end
 
@@ -149,6 +154,10 @@ function Experiment:isDoneExperiment()
     return self._is_done_experiment
 end
 
+------------------------------------------------------------------
+-- call when one epoch is done, collect :report from the compoenents
+-- of Experiment
+------------------------------------------------------------------
 function Experiment:report()
     local report = {
         optimizer = self:optimizer() and self:optimizer():report(),
@@ -296,17 +305,24 @@ function Experiment:silent()
 end
 
 function Experiment:type(new_type)
+    self.log.info('Experiment: set new as :', new_type)
     self._model:mediumSerial(false)
     if self._model then
+        self.log.info('\t reset model as :', new_type)
         self._model:type(new_type)
     end
     if self._optimizer then
+        self.log.info('\t reset optimizer as :', new_type)
+        assert(self._optimizer.isPropagator)
         self._optimizer:type(new_type)
     end
     if self._validator then
+        assert(self._validator.isPropagator)
+        self.log.info('\t reset validator as :', new_type)
         self._validator:type(new_type)
     end
     if self._tester then
+        self.log.info('\t reset tester as :', new_type)
         self._tester:type(new_type)
     end
 end

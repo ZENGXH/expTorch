@@ -85,6 +85,7 @@ end
 -- 
 -----------------------------------------------------
 function BaseSet:GetView(attribute)
+   assert(attribute, 'attribute nil')
    if attribute == 'inputs' or attribute == 'input' then
       if not self._has_input_view then 
          self.log.tracefrom('\t get nil') 
@@ -100,7 +101,7 @@ function BaseSet:GetView(attribute)
          return self._targets
       end
   else
-     error('invalid attribute')
+     error('invalid attribute: ', attribute)
   end
 end
 

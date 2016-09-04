@@ -57,6 +57,10 @@ end
 function Optimizer:backward(batch)
    local input = batch:inputs():input()
    local target = batch:targets():input()
+   if self.cuda then
+       input = input:cuda()
+       target = target:cuda()
+   end
    target = self._target_module:forward(target)
    -- estimate gradient of loss w.r.t. outputs
    self.gradOutput = self._loss:backward(self.output, target)

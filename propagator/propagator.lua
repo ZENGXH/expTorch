@@ -187,6 +187,10 @@ end
 function Propagator:forward(batch)
    local input = batch:inputs():input()
    local target = batch:targets():input()
+   if self.cuda then 
+       input = input:cuda()
+       target = target:cuda()
+   end
    target = self._target_module:forward(target)
    if self._include_target then
       input = {input, target}
@@ -194,6 +198,7 @@ function Propagator:forward(batch)
    -- useful for calling accUpdateGradParameters in callback function
    self._model.dpnn_input = input
    log.trace('forward to model:.... ')   
+   
    -- forward propagate through model
    self.output = self._model:forward(input)
    log.trace('\t forward done ')   
@@ -201,7 +206,10 @@ function Propagator:forward(batch)
    if not self._loss then
       return
    end
+   self._loss = self._loss
    -- measure loss
+   self.log.trace('Propagator forward: input, target', input:type(), target:type())
+   self.log.trace('Pceropagator forward: output', self.output)
    self.err = self._loss:forward(self.output, target)
 end
 
@@ -350,6 +358,11 @@ function Propagator:silent()
 end
 
 function Propagator:type(new_type)
+   self.log.info('\t\t reset type as ', new_type)
+   if self._sampler and new_type == 'torch.CudaTensor' then
+       self._sampler:SetCuda()
+       self.cuda = true
+   end
    if self._loss then
       self._loss:type(new_type)
    end

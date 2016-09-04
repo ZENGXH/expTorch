@@ -45,6 +45,7 @@ function Criteria:__init(config)
    
    self._errors = {}
    self:reset()
+   self.log.tracefrom('Criteria setup done')
 end
 
 function Criteria:_reset()

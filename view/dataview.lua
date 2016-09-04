@@ -32,13 +32,19 @@ end
 -- @para input
 -- fill self._tensors table(inherit from dp.View)
 -- self._tensors = 
---      key: view(string) & value: viewTable,
---          viewTable: key: type(string) & value: torch.Tensor
---  {['bchw'] = {['torch.DoubleTensor'] = input}}
+--      {key: view(string),  value: viewTable}
+--          viewTable: 
+--              {key: Tensortype(string), value: torch.Tensor}
+--
+-- {['bchw'] = {['torch.DoubleTensor'] = input}}
+--
 -- self._modules = 
---      key: view(string) & value: moduleTable
---          moduleTable = {modula, typeConversionTable}
---  {['bchw'] = { nn.Identity(),{['torch.DoubleTensor'] = nn.Identity()}}}
+--      key: view(string), value: [1]modula, [2]moduleTable
+--          moduleTable = 
+--              {key: Tensortype, value: nn.Module}
+--
+--  {['bchw'] = { nn.Identity(),
+--      {['torch.DoubleTensor'] = nn.Identity()}}}
 -----------------------------------------------------------------------
 function DataView:forwardPut(view, input)
    self.log.trace('[DataView] fw PUT view: ', view, 
@@ -68,6 +74,7 @@ end
 -- This method could be called from multiple output Models
 -- return the tensor from the self._tensor by key'view' and key'tensor_type'
 function DataView:forwardGet(view, tensor_type)
+   self.log.info('require view: ', view, ' with tensor_type: ', tensor_type)
    self._got = true
    tensor_type = tensor_type or self._type
    -- retrieve a viewTable
@@ -412,6 +419,7 @@ end
 
 -- flush module and tensor cache
 function DataView:flush()
+   self.log.trace('flush dataview')
    self._tensors = {}
    self._modules = nil
    self._module_graph = {}
@@ -527,8 +535,9 @@ function DataView:ipairsSub(batchSize, inplace, reuse)
 end
 
 function DataView:type(type)
+   self.log.info('dataView type reset type as', type)
    self:flush()
-   self:forwardPut(self._input:type(type))
+   self:forwardPut(nil, self._input:type(type))
 end
 
 
@@ -539,8 +548,18 @@ function DataView:IsFilled()
    return self._is_data_filled
 end
 
+function DataView:SetCuda()
+   self.log.trace('\t\t\t setcuda')
+   self.cuda = true
+end
+
 function DataView:GetInputTensor()
    if self:IsFilled() then
+      if self.cuda then
+         assert(torch.isTensor(self._input))
+         self.log.tracefrom('set tensor as cuda')
+         return self._input
+      end
       return self._input
    else
       error('not filled yet')

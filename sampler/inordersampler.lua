@@ -41,7 +41,9 @@ function InorderSampler:sampleEpoch(dataset)
    -- function which can call as: sampler(batch)
    -- return batch, min(nSampled, epochSize), epochSize
    return function(batch)
-      
+      if self.cuda then
+          batch.cuda = true
+      end
       if nSampled >= epochSize then
          self.log.trace('nSample reach end')
          return
@@ -101,8 +103,12 @@ end
 -- used with datasets that support asynchronous iterators like ImageClassSet
 -- return a function object, call by(batch, putOnly)
 function InorderSampler:sampleEpochAsync(dataset)
-    print('=============')
    self.log.trace('requests iterator')
+   if self.cuda then 
+       use_cuda = true 
+   else 
+       use_cuda = false 
+   end
    assert(dataset.isDataSet)
    -- dataset = dp.Sampler.toDataset(dataset)
    -- variable as control for multithreading
@@ -165,6 +171,9 @@ function InorderSampler:sampleEpochAsync(dataset)
       StartThreadSampleBatch()     
       self.log.trace('call asyncGet: ')
       batch = dataset:asyncGet()
+      if use_cuda then
+          batch:SetCuda()
+      end
       nSampledGet = nSampledGet + self._batch_size
       self:collectgarbage() 
       local epoch_stop_idx = math.min(nSampledGet, epochSize)
