@@ -103,7 +103,7 @@ function VideoClassSet:__init(config)
     self._target_view_type = 'ClassView'
     self._input_shape_set = {self.frames_per_select, unpack(self._sample_size)}
     self._target_shape_set = {batch_size}
-    self._target_view_tensor = 'IntTensor'
+    self._target_view_tensor = 'FloatTensor'
     self._input_view_tensor = 'FloatTensor'
 
     assert(self.io_helper)
