@@ -30,7 +30,10 @@ function InorderSampler:sampleEpoch(dataset)
    assert(dataset.isDataSet)
    -- dataset = dp.Sample.toDataset(dataset)
    local nSample = dataset:nSample()
-   if not self._epoch_size then self._epoch_size = nSample end
+   if not self._epoch_size then 
+       self.log.error('epoch size not set! set to be nSample', nSample)
+       self._epoch_size = nSample 
+   end
    local epochSize = self._epoch_size 
    -- start index of the sample in dataset
    -- self._start = 1 -- if self._start not set, default from 1
@@ -47,6 +50,7 @@ function InorderSampler:sampleEpoch(dataset)
       if nSampled >= epochSize then
          self.log.trace('nSample reach end')
          return false
+      
       end
       -- i.e. the last batch may have batch_size less than self._batch_size
       -- since that there.is not enough sample, which may be dangerous
@@ -113,7 +117,10 @@ function InorderSampler:sampleEpochAsync(dataset)
    -- dataset = dp.Sampler.toDataset(dataset)
    -- variable as control for multithreading
    local nSample = dataset:nSample()
-   if not self._epoch_size then self._epoch_size = nSample end
+   if not self._epoch_size then 
+       self.log.error('epoch size not set!', self._epoch_size, ' set to be nSample', nSample)
+       self._epoch_size = nSample 
+   end
    local epochSize = self._epoch_size
    self._start = self._start or 1
    local nSampledPut = 0
@@ -127,7 +134,7 @@ function InorderSampler:sampleEpochAsync(dataset)
            -- i.e. reach the end of the current epoch
            return false 
        else
-          self.log.info('nSample: ', nSampledGet, ' epoch ', epochSize)
+           self.log.slience('get', nSampledGet ,' ', epochSize)
        end
        -- recurrently put #epochSize sample
        -- if nSampledPut < epochSize then -- renmoved, has been Checked

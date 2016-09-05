@@ -1,3 +1,5 @@
+local log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+log.SetLoggerName('Mediator')
 ------------------------------------------------------------------------
 --[[ Subscriber ]]--
 -- Used by Mediator. Holds a subscriber object which will be called
@@ -7,6 +9,13 @@
 local Subscriber = torch.class("dp.Subscriber")
 Subscriber.isSubscriber = true
 
+-----------------------------------------------------------------------
+-- init: 
+-- @param Subscriber: dp.Subscriber
+-- @param func_name: string
+-- @param id
+-- @param options: table
+-----------------------------------------------------------------------
 function Subscriber:__init(subscriber, func_name, id, options)
    self.options = options or {}
    self.subscriber = subscriber
@@ -30,6 +39,12 @@ end
 local Channel = torch.class("dp.Channel")
 Channel.isChannel = true
 
+-----------------------------------------------------------------------
+-- init
+-- @param: namespace: string
+-- @param: parent
+--
+-----------------------------------------------------------------------
 function Channel:__init(namespace, parent)
     self.stopped = false
     self.namespace = namespace
@@ -41,18 +56,14 @@ end
 function Channel:addSubscriber(subscriber, func_name, id, options)
    local callback = dp.Subscriber(subscriber, func_name, id, options)
    local priority = (#self.callbacks + 1)
-
    options = options or {}
-
    if options.priority and
      options.priority >= 0 and
      options.priority < priority
    then
        priority = options.priority
    end
-
    table.insert(self.callbacks, priority, callback)
-
    return callback
 end
 
@@ -71,7 +82,6 @@ end
 
 function Channel:setPriority(id, priority)
    local callback = self:getSubscriber(id)
-
    if callback.value then
      table.remove(self.callbacks, callback.index)
      table.insert(self.callbacks, priority, callback.value)
@@ -98,17 +108,19 @@ function Channel:removeSubscriber(id)
      for _, channel in pairs(self.channels) do
        channel:removeSubscriber(id)
      end
-
      return table.remove(self.callbacks, callback.index)
    end
 end
 
+-----------------------------------------------------------------------
+-- call all callbacks' subscriber to run the func
 function Channel:publish(channelNamespace, ...)
    for i = 1, #self.callbacks do
       local callback = self.callbacks[i]
       -- if it doesn't have a predicate, or it does and it's true then run it
       if not callback.options.predicate or callback.options.predicate(...) then
          --print(torch.typename(callback.subscriber), callback.func_name)
+         log.trace('publishing', callback,func_name)
          callback.subscriber[callback.func_name](callback.subscriber, ...)
       end
    end
@@ -137,20 +149,25 @@ function Mediator:getChannel(channelNamespace)
    if channelNamespace == ':' then
       return self.channel
    end
-   
    if type(channelNamespace) == 'string' then
       channelNamespace = _.split(channelNamespace, ':')
    end
-   
    local channel = self.channel
-
+   -- get channels recursively from top, e.g. root:optimizer:...
    for i=1, #channelNamespace do
       channel = channel:getChannel(channelNamespace[i])
    end
-
    return channel
 end
 
+--------------------------------------------------------------------------
+-- add a new subscriber to the channels with `channelNamespace`, set the 
+-- subscriber'id as the next counter valur
+-- @param channelNamespace: string
+-- @param subscriber: dp.Subscriber
+-- @param func_name: string
+-- @param options: table
+---------------------------------------------------------------------------
 function Mediator:subscribe(channelNamespace, subscriber, func_name, options)
    local id = self:nextId()
    local channel = self:getChannel(channelNamespace)
@@ -164,7 +181,11 @@ end
 function Mediator:removeSubscriber(id, channelNamespace)
    return self:getChannel(channelNamespace):removeSubscriber(id)
 end
-
+-----------------------------------------------------------------
+-- publish what get in the corresponding channel with `channelNamespace`
+-- @param channelNamespace:string
+-- @param other thing pass to the channel
+----------------------------------------------------------------
 function Mediator:publish(channelNamespace, ...)
    local channel = self:getChannel(channelNamespace)
    channel:publish(channelNamespace, ...)

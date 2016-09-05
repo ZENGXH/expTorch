@@ -26,6 +26,7 @@ function Feedback:__init(config)
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
 
+   self.num_batch_record = 0
    self.selected_output = args.selected_output 
    self._name = args.name
    self._verbose = args.verbose
@@ -64,7 +65,9 @@ end
 
 --accumulates information from the batch
 function Feedback:add(batch, output, report)
+    self.log.trace('Feedback receiver report:', report)
    assert(torch.isTypeOf(batch, 'dp.Batch'), "First argument should be dp.Batch")
+   self.num_batch_record = self.num_batch_record + 1
    self._n_sample = self._n_sample + batch:nSample()
    if self.selected_output ~= 0 and torch.isTypeOf(output, 'table') then
        self.log.trace('selected_output is used')

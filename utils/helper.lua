@@ -10,9 +10,9 @@ end
 
 function helper.unpack_config(object, args, funcname, description, ...)
     local dargs = xlua.unpack(args, funcname, description, ...)
-      for k,v in pairs(dargs) do
+    for k,v in pairs(dargs) do
         object[k] = v
-      end
+    end
 end
 
 function helper.WeightInitUniform(net, v)

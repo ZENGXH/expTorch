@@ -53,11 +53,11 @@ function Confusion:_add(batch, output, report)
       if self._bce then
          self._cm = optim.ConfusionMatrix({0,1})
       else
+         self.log.info('init ConfusionMatrix: with number of classes: ', #batch:GetView('targets'):classes())
          self._cm = optim.ConfusionMatrix(batch:targets():classes())
       end
       self._cm:zero()
    end
-   
    local act = self._bce and output:view(-1) or output:view(output:size(1), -1)
    local tgt = batch:targets():forward('b')
    if self._target_dim >0 then
@@ -74,7 +74,6 @@ function Confusion:_add(batch, output, report)
       act = self._act
       tgt = self._tgt
    end
-   
    if not (torch.isTypeOf(act,'torch.FloatTensor') or torch.isTypeOf(act, 'torch.DoubleTensor')) then
       self._actf = self.actf or torch.FloatTensor()
       self._actf:resize(act:size()):copy(act)
@@ -82,6 +81,11 @@ function Confusion:_add(batch, output, report)
    end
    -- add result to confusion matrix
    self._cm:batchAdd(act, tgt)
+   if self._cm then
+      self._cm:updateValids()
+      report.batch_acc = self._cm.totalValid
+      self.log.trace('acc: ', self._cm.totalValid)
+   end
 end
 
 function Confusion:_reset()
@@ -99,6 +103,7 @@ function Confusion:report()
    --union means divide valid classification by sum of rows and cols
    -- (as opposed to just cols.) minus valid classificaiton 
    -- (which is included in each sum)
+   self.log.info('get acc: ', cm.totalValid)
    return { 
       [self:name()] = {
          matrix = cm.mat,

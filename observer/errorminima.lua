@@ -8,6 +8,16 @@
 ------------------------------------------------------------------------
 local ErrorMinima, parent = torch.class("dp.ErrorMinima", "dp.Observer")
 
+-----------------------------------------------------------------------
+-- init:
+-- config
+-- start_epoch: info
+-- error_report: table
+-- error_channel: string | table
+-- maximize: boolean=false
+-- notify: boolean=true
+-- verbose: boolean=true
+-----------------------------------------------------------------------
 function ErrorMinima:__init(config) 
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args
@@ -41,8 +51,9 @@ function ErrorMinima:__init(config)
    self._sign = self._maximize and -1 or 1
    assert(not(self._error_report and self._error_channel))
    if not (self._error_report or self._error_channel) then
-      self._error_report = {'validator','loss'}
+      self._error_report = {'validator', 'loss'}
    end
+   -- subcribe to channels: "doneEpoch"
    parent.__init(self, "doneEpoch")
 end
 
@@ -53,11 +64,18 @@ function ErrorMinima:setup(config)
    end
 end
 
+---------------------------------------------------------------------
+-- checkk the report after epoch is done, publish to correspoding channels
+-- if infomation is Observered
+-- @param report
+-- @param other arguments needed
+---------------------------------------------------------------------
 function ErrorMinima:doneEpoch(report, ...)
    assert(type(report) == 'table')
    self._epoch = report.epoch
    if self._error_report then
       local report_cursor = report
+      -- check the global report with names in self._error_report
       for _, name in ipairs(self._error_report) do
          report_cursor = report_cursor[name]
       end
@@ -68,6 +86,11 @@ end
 function ErrorMinima:compareError(current_error, ...)
    -- if maximize is true, sign will be -1
    local found_minima = false
+   if type(current_error) == 'table' then
+       self.log.fatal('ErrorMinima get table error, select the first one')
+       print(current_error)
+       current_error = current_error[1]
+   end
    current_error = current_error * self._sign
    if self._epoch >= self._start_epoch then
       if (not self._minima) or (current_error < self._minima) then
@@ -75,8 +98,8 @@ function ErrorMinima:compareError(current_error, ...)
          self._minima_epoch = self._epoch
          found_minima = true
       end
-      
       if self._notify then
+         -- publish found_minima and self to the `errorMinima` channel
          self._mediator:publish("errorMinima", found_minima, self)
       end
    end

@@ -74,7 +74,7 @@ end
 -- This method could be called from multiple output Models
 -- return the tensor from the self._tensor by key'view' and key'tensor_type'
 function DataView:forwardGet(view, tensor_type)
-   self.log.info('require view: ', view, ' with tensor_type: ', tensor_type)
+   self.log.tracefrom('require view: ', view, ' with tensor_type: ', tensor_type)
    self._got = true
    tensor_type = tensor_type or self._type
    -- retrieve a viewTable

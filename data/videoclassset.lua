@@ -112,14 +112,14 @@ function VideoClassSet:__init(config)
         'invalid cache_mode :'..args.cache_mode)
 
     parent.__init(self, config)
-    self.log.info('[videoclassset] _load_size:', self._load_size,
-    '\t frames_per_select', self.frames_per_select,
-    '\t _sample_size;', unpack(self._sample_size),
-    '\t _verbose:', self._verbose,
-    '\t _classID_file:', self._classID_file,
-    '\t _data_list:', self._data_list,
-    '\t _data_path:', self._data_path[1],
-    '\t get sample_func:', self.sample_func)
+    self.log.info('[videoclassset] _load_size:', unpack(self._load_size),
+    '[frames_per_select=', self.frames_per_select,
+    '[_sample_size=', unpack(self._sample_size),
+    '[_verbose=', self._verbose,
+    '[_classID_file=', self._classID_file,
+    '[_data_list=', self._data_list,
+    '[_data_path=', self._data_path[1],
+    '[ get sample_func=', self.sample_func)
  
     -- self.log.info('__init VideoClassSet', unpack(config))
     -- build index in parent
@@ -153,7 +153,6 @@ function VideoClassSet:LoadIndex()
     self.log.info('[loadIndex] from ', self._cache_path, ' after build')
     local index = torch.load(self._cache_path)
     for k, v in pairs(index) do
-        self.log.info('[loadIndex] ',k)
         self[k] = v
     end
     self._n_sample = #self.videoIdVideoPath

@@ -17,7 +17,7 @@ function Optimizer:__init(config)
       'Optimizes a model on a training dataset',
       {arg='loss', type='nn.Criterion', req=true,
        help='a neural network Criterion to evaluate or minimize'},
-      {arg='sampler', type='dp.Sampler', default=dp.ShuffleSampler(),
+      {arg='sampler', type='dp.Sampler', req=true,
        help='used to iterate through the train set. ' ..
        'Defaults to dp.ShuffleSampler()'},
       {arg='acc_update', type='boolean', default=false,
@@ -29,7 +29,7 @@ function Optimizer:__init(config)
        help='function(model, report) that does things like'..
        'update model, gather statistics, decay learning rate, etc.'},
       {arg='update_interval', type='number', default=1,
-       help='update the model every update_interval'},
+       help='update the model every update_interval(batch)'},
       {arg='stats', type='boolean', default=true,
        help='display statistics'}
    )
@@ -49,6 +49,7 @@ function Optimizer:propagateBatch(batch, report)
    self:monitor(batch, report)
    self:backward(batch)
    if report.epoch % self._update_interval == 0 then
+   -- change to callback every batch:
       self._callback(self._model, report)
    end
    self:doneBatch(report)
@@ -71,8 +72,6 @@ function Optimizer:backward(batch)
    if self._acc_update then 
       self.gradInput = self._model:updateGradInput(input, self.gradOutput)
    else
-       print(self.gradOutput)
-       print(input:size(), input:type())
       self.gradInput = self._model:backward(input, self.gradOutput)
    end
    -- so that visitors can known whether or not gradParams were updated

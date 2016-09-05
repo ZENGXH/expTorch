@@ -20,6 +20,9 @@ function log.SetLoggerName(name)
     log.name = name
 end
 
+log.slience = function()
+    return
+end
 local modes = {
     { name = "trace", color = "\27[34m", },
     { name = "tracefrom", color = "\27[34m"},

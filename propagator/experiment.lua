@@ -121,17 +121,17 @@ function Experiment:run(datasource, once)
         self._epoch = self._epoch + 1
         self.log.info('start epoch: ', self._epoch)
         if self._optimizer and train_set then
-            self.log.info('optimizer propagateEpoch..')
+            self.log.info('[[optimizer propagateEpoch]]')
             self._optimizer:propagateEpoch(train_set, report)
             self.log.info('optimizer propagateEpoch done')
         end
         if self._validator and valid_set then
-            self.log.info('validator propagateEpoch..')
+            self.log.info('[[validator propagateEpoch]]')
             self._validator:propagateEpoch(valid_set, report)
             self.log.info('validator propagateEpoch done')
         end
         if self._tester and test_set then
-            self.log.info('tester propagateEpoch..')
+            self.log.info('[[tester propagateEpoch]]')
             self._tester:propagateEpoch(test_set, report)
             self.log.info('tester propagateEpoch done')
         end

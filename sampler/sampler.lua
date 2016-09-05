@@ -82,6 +82,9 @@ function Sampler:__init(config)
    self._mediator = args.mediator
    log.info('[Sampler init done]')
    self._start = 1 -- init with 1
+   self.log.info('[init] Sampler batch_size=', self.batch_size, 
+   'epoch_size=', self._epoch_size, 'gc_freq=', self.gc_freq, 'has mediator: ', self._mediator==nil)
+   self.log.info('ppf: ', self._ppf, 'use cuda: ', self.cuda)
 end
 
 ------------------------------------------------------------------------

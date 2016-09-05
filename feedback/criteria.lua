@@ -17,16 +17,17 @@ function Criteria:__init(config)
    criteria, name, typename_pattern = 
    dp.helper.unpack_config(args, {config},
       'Criteria', nil,
+      {arg='output_to_report', type='boolean', default=false,
+       helper='write result to the report or not'},
       {arg='criteria', type='nn.Criterion | table', req=true,
        help='list of criteria to monitor'},
       {arg='name', type='string', default='criteria'},
-      {arg='output_module', type='table', default={nn.Identity()}, 
-      help='output module apply to output before pass the criteriion'},
+      {arg='output_module', type='table', default={nn.Identity()}, help='output module apply to output before pass the criteriion'},
       {arg='typename_pattern', type='string', 
-       help='require criteria to have a torch.typename that ' ..
-       'matches this pattern', default="^nn[.]%a*Criterion$"}
+       help='require criteria to have a torch.typename that ' ..  'matches this pattern', default="^nn[.]%a*Criterion$"}
    )
    -- assert
+   self.output_to_report = args.output_to_report
    local output_module = args.output_module
    local criteria = args.criteria
    local name = args.name
@@ -69,7 +70,7 @@ function Criteria:_reset()
    end
 end
 
-function Criteria:_add(batch, output, carry, report)             
+function Criteria:_add(batch, output,  report)             
    local current_error
    for k, v in pairs(self._criteria) do
       -- current_error = v:forward(output.act:data(), batch:targets():data())
@@ -85,7 +86,9 @@ function Criteria:_add(batch, output, carry, report)
                          self._n_sample + batch:nSample()
       --TODO gather statistics on backward outputGradients?
    end
-   report.batch_error = self._errors
+   if self.output_to_report == true then
+      report.batch_error = current_error 
+   end
 end
 
 function Criteria:report()

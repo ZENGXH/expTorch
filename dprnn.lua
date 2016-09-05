@@ -139,6 +139,7 @@ dofile(paths.concat(dp.DPRNN_DIR, 'observer/savetofile.lua')) --not an observer 
 dofile(paths.concat(dp.DPRNN_DIR, 'observer/adaptivedecay.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'observer/filelogger.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'observer/hyperlog.lua'))
+dofile(paths.concat(dp.DPRNN_DIR, 'observer/printerobserver.lua'))
 
 --[[ nn ]]--
 dofile(paths.concat(dp.DPRNN_DIR, 'nn/Print.lua'))

@@ -34,6 +34,8 @@ function Batch:__init(config)
    parent.__init(self, config)
 end
 
+
+
 function Batch:SetCuda()
     self.log.trace('\t\t SetCuda')
     self:GetView('input'):SetCuda()

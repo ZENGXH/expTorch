@@ -39,7 +39,9 @@ function Propagator:__init(config)
        help='print verbose information'},
       {arg='stats', type='boolean', default=false,
        help='display performance statistics (speed, etc). '..
-      'Only applies if verbose is true.'}
+      'Only applies if verbose is true.'},
+      {arg='n_display_interval', type='number', default=100, 
+       help='display interval for experiment information in monitor'}
    )
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
@@ -52,6 +54,8 @@ function Propagator:__init(config)
    self._progress = args.progress
    self._verbose = args.verbose
    self._stats = args.stats
+   self.n_batch = 0 -- global as counter for display
+   self.n_display_interval = args.n_display_interval
 end
 
 function Propagator:setup(config)
@@ -113,33 +117,30 @@ function Propagator:propagateEpoch(dataset, report)
       self.log.trace('reset feedback ')
       self._feedback:reset()
    end
-   
    -- local vars
    local start_time = sys.clock()
    local batch, i, n, last_n
-   local n_batch = 0
-   
+   self.n_batch = 0
    if self._stats then
-      print('==> epoch # '..(report.epoch + 1)..' for '..self:name()..' :')
+      print('==> epoch # '..(report.epoch + 1)..
+        ' for '..self:name()..' :')
    end
-   
+
    if self._model.forget then
        self.log.trace('calling forget')
       -- for recurrent modules, forget between epochs
       self._model:forget()
    end
-   
-   self.log.trace('calling epoch callback')
+   self.log.info('calling epoch callback')
    self._epoch_callback(self._model, report)
-   
    self._n_sample = 0
-
    -- create an sampler object in class Sampler
-
    self.log.trace('set up sampler interator: ')
    local sampler = self._sampler:sampleEpoch(dataset)
-   
    self.log.trace('set up done')
+   if not report or report == nil then
+       report = {}
+   end
    while true do
       -- reuse the batch object
       -- if not exist then sampler(batch) will create one
@@ -148,37 +149,50 @@ function Propagator:propagateEpoch(dataset, report)
       end
       self.log.trace('sampling batch')
       batch, i, n = sampler(batch)
-
       if not batch then -- fail?
          -- for aesthetics :
+         self.log.info('doneBatch')
          if self._progress then
             xlua.progress(last_n, last_n)
          end
          break 
       end
-      
       self.nSample = i -- == min(nSampled, epochSize)
       self.log.trace('call propagateBatch')
+      -- if Optimizer: 
+      --    forward + monitor + backward + callback + doneBatch
       self:propagateBatch(batch, report)
+
+      -- change it into channel?
+      if self._observer then
+         self._observer:doneBatch(report)
+     end
       
+      self.log.slience('receiver report: ', report)
       if self._progress then
          -- display progress
          xlua.progress(i, n)
       end
       last_n = n
-      n_batch = n_batch + 1
+      self.n_batch = self.n_batch + 1
    end
-   
+   self.log.info('propagateEpoch reach end, return:')
    -- time taken
    self._epoch_duration = sys.clock() - start_time
-   self._batch_duration = self._epoch_duration / math.max(n_batch, 0.000001)
+   self._batch_duration = self._epoch_duration / math.max(self.n_batch, 0.000001)
    self._example_speed = last_n / self._epoch_duration
-   self._batch_speed = n_batch / self._epoch_duration
+   self._batch_speed = self.n_batch / self._epoch_duration
    if self._stats and self._verbose then
       print("==> example speed = "..self._example_speed..' examples/s')
    end
 end      
-
+---------------------------------------------------------------
+-- calling forward(batch)
+-- monitor(batch, report)
+-- [backward(batch)] -- optimizer
+-- callback(mdoel, report)
+-- doneBatch(report)
+---------------------------------------------------------
 function Propagator:propagateBatch(batch)
    error"NotImplementedError"
 end
@@ -197,31 +211,46 @@ function Propagator:forward(batch)
    -- useful for calling accUpdateGradParameters in callback function
    self._model.dpnn_input = input
    log.trace('forward to model:.... ')   
-   
    -- forward propagate through model
    self.output = self._model:forward(input)
    assert(self.output)
    log.trace('\t forward done ')   
-   
    if not self._loss then
       return
    end
    self._loss = self._loss
    -- measure loss
-   self.log.trace('Propagator forward: input, target', input:type(), target:type())
-   self.log.trace('Pceropagator forward: output', self.output)
+   self.log.slience('Propagator forward: input, target', 
+      input:type(), target:type())
+   self.log.slience('Pceropagator forward: output', self.output)
    self.err = self._loss:forward(self.output, target)
 end
 
+----------------------------------------------------------
+-- add to feedback
+-- sumErr
+-- publish to mediator
+-- @param batch
+-- @param report: table
+-----------------------------------------------------------
 function Propagator:monitor(batch, report)
+   if not report or report == nil then
+       report = {}
+   end
+   self.log.trace('monitoring')
    self.sumErr = self.sumErr + (self.err or 0)
    -- monitor error and such
    if self._feedback then
+       -- call _add of the read feedback object
       self._feedback:add(batch, self.output, report)
    end
-   
+   if self._observer then
+      self._observer:doneBatch(report)
+   end
    --publish report for this optimizer
+   -- [[ add observer ?]]
    self._mediator:publish(self:name()..':'.."doneFeedback", report, batch)
+   
 end
 
 function Propagator:doneBatch(report)   

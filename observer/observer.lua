@@ -15,6 +15,11 @@
 local Observer = torch.class("dp.Observer")
 Observer.isObserver = true
 
+-----------------------------------------------------------------------
+-- _init a Observer
+-- @param channels: string | table eg. "doneEpoch"
+-- @param callbacks: string | table, f not given, same with channels
+-----------------------------------------------------------------------
 function Observer:__init(channels, callbacks)
    if type(channels) == 'string' then
       channels = {channels}
@@ -28,18 +33,26 @@ function Observer:__init(channels, callbacks)
    self.log.SetLoggerName('Observer')
 end
 
-function Observer:subscribe(channel, callback)
-   self._mediator:subscribe(channel, self, callback or channel)
+-----------------------------------------------------------------------
+-- subscribe the channel and callback 
+function Observer:subscribe(channelNamespace, callback)
+   -- channelNamespace, self as the subscribes, func_name: callback
+   self._mediator:subscribe(channelNamespace, self, callback or channel)
 end
 
---should be reimplemented to validate subject
+-- @param subject: Propagator?
+-- should be reimplemented to validate subject
 function Observer:setSubject(subject)
    --assert subject.isSubjectType
    self._subject = subject
 end
 
---An observer is setup with a mediator and a subject.
+----------------------------------------------------------------------
+--An observer is setup with 
+--a mediator 
+--a subject. e,g, the `Experiment` where setup the observer
 --The subject is usually the object from which the observer is setup.
+----------------------------------------------------------------------
 function Observer:setup(config)
    assert(type(config) == 'table', "Setup requires key-value arguments")
    local args, mediator, subject = xlua.unpack(
@@ -67,4 +80,15 @@ end
 
 function Observer:silent()
    self:verbose(false)
+end
+
+---------------------------------------------------------------
+-- look foe the attribute with `name` in the reportm 
+-- may `publish`/ notify to _mediator
+function Observer:doneEpoch(report, ...)
+    error('abstrace method')
+end
+
+function Observer:doneBatch(report, ...)
+    self.log.trace('not implement')
 end
