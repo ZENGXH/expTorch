@@ -605,7 +605,6 @@ function ImageClassSet:multithread(nThread)
       nThread,
       -- all function below will be executed in all thread
       function() -- make a separated f1 containing all the definitions 
-        print('threading')
         require 'dprnn.dprnn'
       end,
     
@@ -616,7 +615,7 @@ function ImageClassSet:multithread(nThread)
          math.randomseed(seed)
          torch.manualSeed(seed)
          if config.verbose then
-            print(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
+            self.log.info(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
          end
          dataset = dp[self._class_set](config)
 
@@ -728,7 +727,6 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
       function()
          -- set the transfered storage
          
-         print('setStorage')
          torch.setFloatStorage(input, inputPointer)
          torch.setIntStorage(target, targetPointer)
          local view =  'btchw'
@@ -736,7 +734,6 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
          tbatch:inputs():forward(view, input)
          tbatch:targets():forward('b', target)
 
-         print('forward')
          
          dataset:sample(tbatch, nSample, sampleFunc)
          assert(tbatch:inputs():input()) 

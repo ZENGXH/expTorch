@@ -57,7 +57,7 @@ end
 function Optimizer:backward(batch)
    local input = batch:inputs():input()
    local target = batch:targets():input()
-   if self.cuda then
+   if self.cuda == true then
        input = input:cuda()
        target = target:cuda()
    end
@@ -71,6 +71,8 @@ function Optimizer:backward(batch)
    if self._acc_update then 
       self.gradInput = self._model:updateGradInput(input, self.gradOutput)
    else
+       print(self.gradOutput)
+       print(input:size(), input:type())
       self.gradInput = self._model:backward(input, self.gradOutput)
    end
    -- so that visitors can known whether or not gradParams were updated

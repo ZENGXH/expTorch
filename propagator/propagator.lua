@@ -77,7 +77,6 @@ function Propagator:setup(config)
    local model = args.model
    local mediator = args.mediator
    local target_module = args.target_module
-
    assert(torch.isTypeOf(id, 'dp.ObjectID'))
    assert(torch.isTypeOf(args.mediator, 'dp.Mediator'))
    self._id = args.id
@@ -187,7 +186,7 @@ end
 function Propagator:forward(batch)
    local input = batch:inputs():input()
    local target = batch:targets():input()
-   if self.cuda then 
+   if self.cuda == true then 
        input = input:cuda()
        target = target:cuda()
    end
@@ -201,6 +200,7 @@ function Propagator:forward(batch)
    
    -- forward propagate through model
    self.output = self._model:forward(input)
+   assert(self.output)
    log.trace('\t forward done ')   
    
    if not self._loss then
@@ -359,9 +359,12 @@ end
 
 function Propagator:type(new_type)
    self.log.info('\t\t reset type as ', new_type)
-   if self._sampler and new_type == 'torch.CudaTensor' then
-       self._sampler:SetCuda()
-       self.cuda = true
+   if new_type == 'torch.CudaTensor' then
+      self.log.info('Propagator cuda set')
+      self.cuda = true
+      if self._sampler then
+         self._sampler:SetCuda()
+      end
    end
    if self._loss then
       self._loss:type(new_type)
