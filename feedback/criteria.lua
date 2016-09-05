@@ -13,29 +13,41 @@ Criteria.isCriteria = true
 
 function Criteria:__init(config)
    assert(type(config) == 'table', "Constructor requires key-value arguments")
-   local args, criteria, name, typename_pattern = xlua.unpack(
-      {config},
+   local args = {}
+   criteria, name, typename_pattern = 
+   dp.helper.unpack_config(args, {config},
       'Criteria', nil,
       {arg='criteria', type='nn.Criterion | table', req=true,
        help='list of criteria to monitor'},
       {arg='name', type='string', default='criteria'},
+      {arg='output_module', type='table', default={nn.Identity()}, 
+      help='output module apply to output before pass the criteriion'},
       {arg='typename_pattern', type='string', 
        help='require criteria to have a torch.typename that ' ..
        'matches this pattern', default="^nn[.]%a*Criterion$"}
    )
+   -- assert
+   local output_module = args.output_module
+   local criteria = args.criteria
+   local name = args.name
+   local typename_pattern = args.typename_pattern
+   assert(torch.type(output_module) == 'table', 'output_module must in tabke get '..torch.type(output_module))
+   assert(torch.isTypeOf(output_module[1], 'nn.Module'), 'output_module[1] is a '..torch.type(output_module[1]))
    config.name = name
    parent.__init(self, config)
    self._criteria = {}
+   self._output_module = {}
    self._name = name
    if torch.typename(criteria) then
       criteria = {criteria}
    end
-   
    for k,v in pairs(criteria) do
       -- non-list items only
-      if type(k) ~= 'number' then
+      -- if type(k) ~= 'number' then
+         self.log.trace('insert criteria: ', v, self._output_module[k])
          self._criteria[k] = v
-      end
+         self._output_module[k] = args.output_module[k] or nn.Identity()
+      -- end
    end
    
    for i, v in ipairs(criteria) do
@@ -59,16 +71,10 @@ end
 
 function Criteria:_add(batch, output, carry, report)             
    local current_error
-   local new_output
-   if torch.isTypeOf(output, 'table') and self.selected_output then
-        new_output = output[1]
-   else
-       new_output = output
-   end
-    assert(torch.isTensor(new_output))
    for k, v in pairs(self._criteria) do
-      -- current_error = v:forward(new_output.act:data(), batch:targets():data())
-      
+      -- current_error = v:forward(output.act:data(), batch:targets():data())
+      self.log.trace('forward ', v)      
+      local new_output = self._output_module[k]:forward(output)
       current_error = v:forward(new_output, batch:targets():input())
       self._errors[k] =  (
                               ( self._n_sample * self._errors[k] ) 
@@ -79,6 +85,7 @@ function Criteria:_add(batch, output, carry, report)
                          self._n_sample + batch:nSample()
       --TODO gather statistics on backward outputGradients?
    end
+   report.batch_error = self._errors
 end
 
 function Criteria:report()
