@@ -33,6 +33,7 @@ function Feedback:__init(config)
    self._n_sample = 0
 end
 
+function Feedback:type(new_type)
 function Feedback:setup(config)
    assert(type(config) == 'table', "Setup requires key-value arguments")
    local args = {}
@@ -70,6 +71,7 @@ function Feedback:add(batch, output, report)
    self.num_batch_record = self.num_batch_record + 1
    self._n_sample = self._n_sample + batch:nSample()
    if self.selected_output ~= 0 and torch.isTypeOf(output, 'table') then
+       error('deprecidate about selected_output')
        self.log.trace('selected_output is used')
        dp.helper.Assertlet(self.selected_output, #output, 'selected_output too large')
        self:_add(batch, output[self.selected_output], report)
