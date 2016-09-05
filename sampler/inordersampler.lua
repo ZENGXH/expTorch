@@ -46,7 +46,7 @@ function InorderSampler:sampleEpoch(dataset)
       end
       if nSampled >= epochSize then
          self.log.trace('nSample reach end')
-         return
+         return false
       end
       -- i.e. the last batch may have batch_size less than self._batch_size
       -- since that there.is not enough sample, which may be dangerous
@@ -125,7 +125,9 @@ function InorderSampler:sampleEpochAsync(dataset)
            self.log.trace('nSample reach end')
            -- do nothind is the Sampled Get intotal is enough for the epoch
            -- i.e. reach the end of the current epoch
-           return 
+           return false 
+       else
+          self.log.info('nSample: ', nSampledGet, ' epoch ', epochSize)
        end
        -- recurrently put #epochSize sample
        -- if nSampledPut < epochSize then -- renmoved, has been Checked
@@ -164,11 +166,15 @@ function InorderSampler:sampleEpochAsync(dataset)
        if self._start >= nSample then
            self._start = 1
        end
+       return true
    end      
    ----------------------------------------------------------------------------
    --[[ build iterator ]]--
    local sampleBatch = function(batch)
-      StartThreadSampleBatch()     
+       local batch_left = StartThreadSampleBatch()
+      if not batch_left then
+          return
+      end
       self.log.trace('call asyncGet: ')
       batch = dataset:asyncGet()
       if use_cuda then
