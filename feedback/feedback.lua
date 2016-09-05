@@ -33,7 +33,6 @@ function Feedback:__init(config)
    self._n_sample = 0
 end
 
-function Feedback:type(new_type)
 function Feedback:setup(config)
    assert(type(config) == 'table', "Setup requires key-value arguments")
    local args = {}
@@ -66,7 +65,11 @@ end
 
 --accumulates information from the batch
 function Feedback:add(batch, output, report)
-    self.log.trace('Feedback receiver report:', report)
+   local feed_output = output
+   if torch.type(output) == 'torch.CudaTensor' then
+       feed_output = output:float()
+   end
+   self.log.trace('Feedback receiver report:', report)
    assert(torch.isTypeOf(batch, 'dp.Batch'), "First argument should be dp.Batch")
    self.num_batch_record = self.num_batch_record + 1
    self._n_sample = self._n_sample + batch:nSample()
@@ -74,9 +77,9 @@ function Feedback:add(batch, output, report)
        error('deprecidate about selected_output')
        self.log.trace('selected_output is used')
        dp.helper.Assertlet(self.selected_output, #output, 'selected_output too large')
-       self:_add(batch, output[self.selected_output], report)
+       self:_add(batch, feed_output[self.selected_output], report)
     else
-        self:_add(batch, output, report)
+        self:_add(batch, feed_output, report)
     end
 end
 
