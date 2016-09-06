@@ -135,13 +135,11 @@ function Propagator:propagateEpoch(dataset, report)
       -- for recurrent modules, forget between epochs
       self._model:forget()
    end
-   self.log.info('calling epoch callback')
    self._epoch_callback(self._model, report)
    self._n_sample = 0
    -- create an sampler object in class Sampler
    self.log.trace('set up sampler interator: ')
    local sampler = self._sampler:sampleEpoch(dataset)
-   self.log.trace('set up done')
    if not report or report == nil then
        report = {}
    end
@@ -155,7 +153,6 @@ function Propagator:propagateEpoch(dataset, report)
       batch, i, n = sampler(batch)
       if not batch then -- fail?
          -- for aesthetics :
-         self.log.info('doneBatch')
          if self._progress then
             xlua.progress(last_n, last_n)
          end
@@ -167,10 +164,6 @@ function Propagator:propagateEpoch(dataset, report)
       --    forward + monitor + backward + callback + doneBatch
       self:propagateBatch(batch, report)
 
-      -- change it into channel?
-      if self._observer then
-         self._observer:doneBatch(report)
-     end
       
       self.log.slience('receiver report: ', report)
       if self._progress then
@@ -180,7 +173,6 @@ function Propagator:propagateEpoch(dataset, report)
       last_n = n
       self.n_batch = self.n_batch + 1
    end
-   self.log.info('propagateEpoch reach end, return:')
    -- time taken
    self._epoch_duration = sys.clock() - start_time
    self._batch_duration = self._epoch_duration / math.max(self.n_batch, 0.000001)

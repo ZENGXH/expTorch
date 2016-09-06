@@ -143,6 +143,9 @@ function VideoClassSet:__init(config)
     self._class_set = 'VideoClassSet' 
     assert(self._input_shape == VideoClassSet._input_shape)
 end
+function VideoClassSet:nSample()
+    return self._n_sample
+end
 
 function VideoClassSet:SaveIndex(info)
     self.log.info('[SaveIndex] in ', self._cache_path, ' after build')
@@ -156,9 +159,9 @@ function VideoClassSet:LoadIndex()
         self[k] = v
     end
     self._n_sample = #self.videoIdVideoPath
-    self._n_video = #self._classes
+    self._n_label = #self._classes
     self._n_frame = torch.Tensor(self.videoLength):sum()
-    self.log.info(string.format('[VideoClassSet] BuildIndex done, get #samples %d, #video %d, #frames %d intotal', self._n_sample, self._n_video, self._n_frame))
+    self.log.info(string.format('[VideoClassSet] BuildIndex done, get #samples %d, #video %d, #frames %d intotal', self._n_sample, self._n_label, self._n_frame))
     self._index_loaded = true
 end
 ------------------------------------------------------------------------
@@ -203,9 +206,10 @@ end
 ------------------------------------------------------------------------
 
 function VideoClassSet:GetNumOfVideo()
-    assert(self._n_video)
-    return self._n_video
+    assert(self._n_sample)
+    return self._n_sample
 end
+
 
 function VideoClassSet:Shuffle()
     self.list_video_index = torch.Tensor():randperm(self:GetNumOfVideo())
@@ -416,8 +420,9 @@ end
 -----------------------------------------------------------------
 function VideoClassSet:_GetOrderSample5D(start, stop, 
     inputTable, targetTable)
+    dp.helper.Assertlet(stop, self.list_video_index:nElement(), 'nSample: '..self:nSample())
   self.log.trace('GetOrdersampling iter ')
-  for i = 1, stop - start+ 1 do
+  for i = 1, stop - start + 1 do
         self.log.trace('inserting')
         -- sample video from class
         -- local index_in_class_ran = torch.random(1, 

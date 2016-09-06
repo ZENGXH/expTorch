@@ -90,7 +90,7 @@ function Experiment:setup()
         }
     end
     if self._tester then
-        assert(self._tester.isPropagatort)
+        assert(self._tester.isPropagator)
         self._tester:setup{
             mediator=self._mediator, 
             id=self:id():create('tester'),
@@ -119,25 +119,24 @@ function Experiment:run(datasource, once)
     local atleastonce = false
     repeat
         self._epoch = self._epoch + 1
-        self.log.info('start epoch: ', self._epoch)
+        self.log.trace('start epoch: ', self._epoch)
         if self._optimizer and train_set then
-            self.log.info('[[optimizer propagateEpoch]]')
+            self.log.trace('[[optimizer propagateEpoch]]')
             self._optimizer:propagateEpoch(train_set, report)
-            self.log.info('optimizer propagateEpoch done')
+            self.log.trace('optimizer propagateEpoch done')
         end
         if self._validator and valid_set then
-            self.log.info('[[validator propagateEpoch]]')
+            self.log.trace('[[validator propagateEpoch]]')
             self._validator:propagateEpoch(valid_set, report)
-            self.log.info('validator propagateEpoch done')
+            self.log.trace('validator propagateEpoch done')
         end
         if self._tester and test_set then
-            self.log.info('[[tester propagateEpoch]]')
+            self.log.trace('[[tester propagateEpoch]]')
             self._tester:propagateEpoch(test_set, report)
-            self.log.info('tester propagateEpoch done')
+            self.log.trace('tester propagateEpoch done')
         end
         self.log.info('collecting report')
         report = self:report()
-
         self._mediator:publish("doneEpoch", report)
         atleastonce = true
     until (self:isDoneExperiment() or self._epoch >= self._max_epoch or (once and atleastonce))

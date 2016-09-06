@@ -110,7 +110,7 @@ function Confusion:report()
    --union means divide valid classification by sum of rows and cols
    -- (as opposed to just cols.) minus valid classificaiton 
    -- (which is included in each sum)
-   self.log.info('get acc: ', cm.totalValid)
+   self.log.slience('get acc: ', cm.totalValid)
    return { 
       [self:name()] = {
          matrix = cm.mat,

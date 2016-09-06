@@ -1,5 +1,6 @@
 ------------------------------------------------------------------------
 --[[ VisualDataSet ]]--
+-- an abstract class
 -- for common function of VisualDataSet and videoclassset
 -- interface
 ------------------------------------------------------------------------
@@ -72,14 +73,7 @@ end
 ------------------------------------------------------------------------
 --[[overwrite]]--
 function VisualDataSet:nSample(class, list)
-   list = list or self.classList
-   if not class then
-      return self._n_sample
-   elseif type(class) == 'string' then
-      return list[self._classIndices[class]]:size(1)
-   elseif type(class) == 'number' then
-      return list[class]:size(1)
-   end
+   error('abstract method here')
 end
 
 function VisualDataSet:getImageBuffer(i)
