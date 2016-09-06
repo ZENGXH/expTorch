@@ -29,7 +29,7 @@ function Observer:__init(channels, callbacks)
    end
    self._channels = channels or {}
    self._callbacks = callbacks or channels
-   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log = dp.log -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName('Observer')
 end
 

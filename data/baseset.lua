@@ -42,7 +42,7 @@ function BaseSet:__init(config)
        'to a ListView. The indices of examples must be '..
        'in both inputs and targets must be aligned.'}
    )
-   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log = dp.log -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
    self:whichSet(args.which_set)
    self._has_target_view = false

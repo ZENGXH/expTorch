@@ -1,4 +1,4 @@
-local log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+local log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
 log.SetLoggerName('Mediator')
 ------------------------------------------------------------------------
 --[[ Subscriber ]]--

@@ -1,5 +1,5 @@
 local ucf101_helper = {}
-local log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+local log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
 -- read the train_list_split.txt and convert it into data_dict in lua format
 -- @param video_list the txt file to be processed
 -----------
@@ -115,6 +115,7 @@ function ucf101_helper.LoadBinFile(filepath, datatype)
     data = torch.FloatTensor(data)
     -- print('size of data: ', shape[1], shape[2], shape[3], shape[4])
     file:close()
+    data = data:type(dp.DefaultTensorType)
     return data -- return 1024 feature if seg5. 101 feature if prob
 end
 

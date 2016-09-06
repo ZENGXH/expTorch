@@ -57,7 +57,7 @@ function Sampler:__init(config)
        help='used for communication between objects'}
  
    )
-   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
    self._ppf = args.ppf or function(batch) 
         return batch 
@@ -78,7 +78,7 @@ function Sampler:__init(config)
    self.log.info('[init] Sampler batch_size=', self._batch_size, 'epoch_size=', 
    self._epoch_size, 'gc_freq=', self.gc_freq, 'has mediator: ', self._mediator==nil)
    self.log.info('ppf: ', self._ppf)
-   log.info('[Sampler init done]')
+   self.log.info('[Sampler init done]')
 end
 
 ------------------------------------------------------------------------

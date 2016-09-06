@@ -45,8 +45,8 @@ function Propagator:__init(config)
       {arg='n_display_interval', type='number', default=100, 
        help='display interval for experiment information in monitor'}
    )
-   self.tensorType = 'torch.FloatTensor' -- default 
-   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.tensorType = dp.DefaultTensorType -- 'torch.DoubleTensor' -- by default
+   self.log = dp.log -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
    self:sampler(args.sampler or dp.Sampler())
    self:loss(args.loss) -- setup Criterion

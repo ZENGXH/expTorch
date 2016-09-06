@@ -23,9 +23,9 @@ function Feedback:__init(config)
       {arg='name', type='string', req=true,
        help='used to identify report'}
    )
-   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
-   self.tensorType = 'torch.FloatTensor' -- by default
+   self.tensorType = dp.DefaultTensorType -- 'torch.DoubleTensor' -- by default
    self.cuda = false
    self.num_batch_record = 0
    self.selected_output = args.selected_output 

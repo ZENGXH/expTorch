@@ -25,7 +25,6 @@ if opt.cuda then
     cutorch.setDevice(opt.device_id)
  end
 
-
 --[[ criterion ]]--
 dp.DATA_DIR='/data1/zengxiaohui/experiment/action_data/ucf101'
 assert(opt.classID_file)

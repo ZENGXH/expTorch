@@ -8,8 +8,9 @@
 -- under the terms of the MIT license. See LICENSE for details.
 --
 
-local log = { _version = "0.1.0" }
-
+-- local log = torch.class('dp.log')
+-- { _version = "0.1.0" }
+local log = {}
 log.usecolor = true
 log.outfile = log.outfile or paths.concat(os.getenv('PWD'), 'log')
 log.level = "info"

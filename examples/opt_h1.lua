@@ -2,7 +2,7 @@ require 'nn'
 local opt = {}
 
 --[[ solver ]]--
-opt.learning_rate = 0.001 --starting learning rate
+opt.learning_rate = 0.01 --starting learning rate
 opt.learningRate_decay = 0.000001 -- opt.learning_rate * 0.05 
 opt.weight_decay_iter = 12000
 opt.batch_size = 200 --number of sequences to train on in parallel
@@ -87,10 +87,10 @@ opt.data_train_list='/data1/zengxiaohui/experiment/action_data/ucf101_list/train
 opt.data_test_list='/data1/zengxiaohui/experiment/action_data/ucf101_list/test_list_split1.txt'
 opt.data_root='/data1/zengxiaohui/experiment/action_data/ucf101'
 opt.data_folder='seg5_video'
-opt.frames_per_select_train=4
+opt.frames_per_select_train=1
 
 -- GPU/CPU
-opt.cuda = true -- true -- 'use CUDA')
+opt.cuda = true -- false --true -- true -- 'use CUDA')
 opt.time = 0 --print batch times
 opt.cudnn = 1 --use cudnn (1=yes). this should greatly speed up convolutions
 opt.device_id = 2

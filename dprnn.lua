@@ -22,10 +22,13 @@ ffi = require 'ffi'
 ------------------------------------------------------------------------
 
 dp = {}
+dp.DefaultTensorType = 'torch.DoubleTensor' -- by default
 dp.TORCH_DIR = os.getenv('TORCH_DATA_PATH') or os.getenv('HOME')
 dp.EXP_DIR = os.getenv('PWD')   
 dp.DPRNN_DIR='/data1/zengxiaohui/dprnn'
 --[[ utils ]]--
+-- dofile(paths.concat(dp.dprnn_dir, 'utils/log.lua'))
+dp.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils/log.lua'))()
 dofile(paths.concat(dp.DPRNN_DIR, 'utils/utils.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'utils/underscore.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'utils/os.lua'))
@@ -51,6 +54,7 @@ dp.UNIT_DIR = os.getenv('DEEP_UNIT_PATH')
 dp.mkdir(dp.UNIT_DIR)
    
 --[[ misc ]]--
+--[[ utils ]]--
 dofile(paths.concat(dp.DPRNN_DIR, 'xplog.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'mediator.lua'))
 dofile(paths.concat(dp.DPRNN_DIR, 'objectid.lua'))

@@ -148,8 +148,9 @@ function VisualDataSet:multithread(nThread,batch_size)
       local seed = mainSeed + idx
       math.randomseed(seed)
       torch.manualSeed(seed)
-      self.log.info(string.format('Starting worker thread with id: %d seed: %d', tid, seed), 
-        'setup class_set: ', self._class_set, ' with batch_size ', batch_size)
+      -- self.log.info('..')
+      -- self.log.info(string.format('Starting worker thread with id: %d seed: %d', tid, seed), 
+      --  'setup class_set: ', self._class_set, ' with batch_size ', batch_size)
       dataset = dp[self._class_set](config)
       tbatch = dataset:InitBatchWithSize(batch_size)
    end

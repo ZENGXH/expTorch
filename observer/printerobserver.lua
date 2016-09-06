@@ -23,7 +23,7 @@ function PrinterObserver:__init(config)
     parent.__init(self, config)
 
     self._print_report = {'batch_acc', 'batch_err'}
-   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log = dp.log --  loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
    self.display_interval = args.display_interval
    self.batch_counter = 0

@@ -1,4 +1,4 @@
-local log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+local log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
 local helper = torch.class("dp.helper")
 
 function helper:__init()
@@ -184,3 +184,5 @@ function helper.recursiveType(param, type, tensorCache)
 end
 
 return helper
+
+-- vim:ts=3 ss=3 sw=3 expandtab

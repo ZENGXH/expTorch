@@ -53,7 +53,7 @@ function DataSource:__init(config)
 
    local input_preprocess = args.input_preprocess
    local target_preprocess = args.target_preprocess
-   self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(name)
    --preprocessing
    self:inputPreprocess(input_preprocess)
