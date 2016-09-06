@@ -25,7 +25,7 @@ end
 function helper.GetSize(a)
     return a:size():totable()
 end
-  
+
 function helper.PrintSize(a)
     if a:dim() == 1 then
         return string.format('dim(1) %d', table.unpack(helper.GetSize(a)))
@@ -84,7 +84,7 @@ function helper.LoadBinFile(filepath, datatype)
         shape[i] = a[1]
     end
     local total = shape[1] * shape[2] * shape[3] * shape[4]
-    
+
     local data
     if datatype == 'float' then
         data = file:readFloat(total)
@@ -94,7 +94,7 @@ function helper.LoadBinFile(filepath, datatype)
     -- print('data', data)
     data = torch.FloatTensor(data)
     -- print('size of data: ', shape[1], shape[2], shape[3], shape[4])
-    
+
     file:close()
     return data -- return 1024 feature if seg5. 101 feature if prob
 end
@@ -126,13 +126,61 @@ function helper.Assertnq(a, b, msg)
 end
 
 function helper.TrackMemory(free, msg)
-   collectgarbage()
+    collectgarbage()
     require 'cutorch'
     local msg = msg or '..'
     local old_free = free or 0
     local freeMemory, totalMemory = cutorch.getMemoryUsage(cutorch.getDevice())
     log.info(string.format('>> %s TrackMemory >> freeMemory from %.3f to %.3f %s', helper.GetBugLocation, old_free/(1024 * 1024), freeMemory/(1024*1024), msg))
     return freeMemory
+end
+
+function helper.recursiveType(param, type, tensorCache)
+    tensorCache = tensorCache or {}
+
+    if torch.type(param) == 'table' then
+        for k, v in pairs(param) do
+            param[k] = dp.helper.recursiveType(v, type, tensorCache)
+        end
+    elseif torch.isTypeOf(param, 'nn.Module') or
+        torch.isTypeOf(param, 'nn.Criterion') then
+        param:type(type, tensorCache)
+    elseif torch.isTensor(param) then
+        if torch.typename(param) ~= type then
+            local newparam
+            if tensorCache[param] then
+                newparam = tensorCache[param]
+            else
+                newparam = torch.Tensor():type(type)
+                local storageType = type:gsub('Tensor','Storage')
+                if param:storage() then
+                    local storage_key = torch.pointer(param:storage())
+                    if not tensorCache[storage_key] then
+                        tensorCache[storage_key] = torch_Storage_type(
+                        param:storage(), storageType)
+                    end
+                    assert(torch.type(tensorCache[storage_key]) == storageType)
+                    newparam:set(
+                    tensorCache[storage_key],
+                    param:storageOffset(),
+                    param:size(),
+                    param:stride()
+                    )
+                end
+                tensorCache[param] = newparam
+            end
+            assert(torch.type(newparam) == type)
+            param = newparam
+        end
+    -- if the param has type(), do type conversion
+    else
+       log.info('convering ', param) 
+        if param:type() ~= nil then
+            log.info('can be convert', param)
+            param:type(type)
+        end
+    end
+    return param
 end
 
 return helper

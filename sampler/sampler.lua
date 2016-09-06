@@ -64,7 +64,6 @@ function Sampler:__init(config)
    )
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
-   self.cuda = false
    self._ppf = args.ppf or function(batch) 
         return batch 
     end
@@ -84,7 +83,7 @@ function Sampler:__init(config)
    self._start = 1 -- init with 1
    self.log.info('[init] Sampler batch_size=', self.batch_size, 
    'epoch_size=', self._epoch_size, 'gc_freq=', self.gc_freq, 'has mediator: ', self._mediator==nil)
-   self.log.info('ppf: ', self._ppf, 'use cuda: ', self.cuda)
+   self.log.info('ppf: ', self._ppf)
 end
 
 ------------------------------------------------------------------------
@@ -160,10 +159,6 @@ function Sampler:collectgarbage()
 end
 -----------------------------------------------------------------
 -- type conversion for cuda
-function Sampler:SetCuda()
-    self.log.info('\t setCuda')
-    self.cuda = true
-end
 
 -- change normal sampleEpoch to sampleEpochAsync
 function Sampler:async()

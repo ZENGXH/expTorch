@@ -44,27 +44,33 @@ function Confusion:doneEpoch(report)
    end
 end
 
+function Confusion:InitCm(batch)
+      if self._bce then
+         self._cm = optim.ConfusionMatrix({0,1})
+      else
+         self.log.info('init ConfusionMatrix: with number of classes: ', 
+            #batch:GetView('targets'):classes())
+         self._cm = optim.ConfusionMatrix(batch:GetView('target'):classes())
+      end
+      self._cm:zero()
+end 
+
 function Confusion:_add(batch, output, report)
    if self._output_module then
       output = self._output_module:updateOutput(output)
    end
    -- init ConfusionMatrix   
    if not self._cm then
-      if self._bce then
-         self._cm = optim.ConfusionMatrix({0,1})
-      else
-         self.log.info('init ConfusionMatrix: with number of classes: ', #batch:GetView('targets'):classes())
-         self._cm = optim.ConfusionMatrix(batch:targets():classes())
-      end
-      self._cm:zero()
+       self:InitCm(batch)
    end
    local act = self._bce and output:view(-1) or output:view(output:size(1), -1)
-   local tgt = batch:targets():forward('b')
+   local tgt = batch:GetView('target'):forwardGet('b', self.tensorType)
+
    if self._target_dim >0 then
       tgt=tgt[self._target_dim]
    end
    
-   if self._bce then
+   if self._bce then -- use binary cross entropy
       self._act = self._act or act.new()
       self._tgt = self._tgt or tgt.new()
       -- round it to get a class
@@ -74,7 +80,8 @@ function Confusion:_add(batch, output, report)
       act = self._act
       tgt = self._tgt
    end
-   if not (torch.isTypeOf(act,'torch.FloatTensor') or torch.isTypeOf(act, 'torch.DoubleTensor')) then
+
+   if not (torch.isTypeOf(act,'torch.FloatTensor') or torch.isTypeOf(act, 'torch.DoubleTensor') or torch.isTypeOf(act, 'torch.CudaTensor')) then
       self._actf = self.actf or torch.FloatTensor()
       self._actf:resize(act:size()):copy(act)
       act = self._actf
@@ -121,5 +128,14 @@ function Confusion:report()
       },
       n_sample = self._n_sample
    }
+end
+
+function Confusion:type(type)
+    if not type then  
+        return self._output_module:type()
+    end
+    self.tensorType = type
+    self._output_module = self._output_module:type(type)
+    return self
 end
 

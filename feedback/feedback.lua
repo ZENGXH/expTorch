@@ -25,7 +25,8 @@ function Feedback:__init(config)
    )
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
-
+   self.tensorType = 'torch.FloatTensor' -- by default
+   self.cuda = false
    self.num_batch_record = 0
    self.selected_output = args.selected_output 
    self._name = args.name
@@ -65,6 +66,8 @@ end
 
 --accumulates information from the batch
 function Feedback:add(batch, output, report)
+    -- TODO: how to dead with output as table, tyoe conversion not working
+    -- or conver the module of feedback?
    local feed_output = output
    if torch.type(output) == 'torch.CudaTensor' then
        feed_output = output:float()
@@ -109,3 +112,48 @@ end
 function Feedback:nSample()
    return self._n_sample or 0
 end
+
+function Feedback:type(new_type)
+--[[
+    if new_type == nil then
+        return self:type()
+    end
+    self.tensorType = new_type 
+    dp.helper.recursiveType(self:GetModules(), type, tensorCache)
+]]--
+    error('abstract need implement')
+end
+
+function Feedback:cuda()
+    self:type('torch.CudaTensor')
+end
+
+-------------------------------------------------------------------
+-- <>customer type conversion function for Feedback
+-- recursiveType componend
+-- add tensorType for batch:GetView('target'):forwardGet
+------------------------------------------------------------------
+function Feedback:GetModules()
+    error('abstract method need implement')
+end
+
+------------------------------------------------------------------
+-- recursiveType can only works for table, nn.Module, Tensor
+------------------------------------------------------------------
+--[[
+function Feedback:SetCuda()
+    assert(self.GetModules, ' sub class need to implement GetModules')
+    local get = self:GetModules()
+    local param = get
+    self.log.info('convert: ', get)
+  if torch.type(get) == 'table' then
+        for k, v in pairs(param) do
+        -- param[k] = nn.utils.recursiveType(v, type, tensorCache)
+           print(param[k])
+       end
+  else
+      print(torch.type(param), param)
+  end
+end
+
+]]--

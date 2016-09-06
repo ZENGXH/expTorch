@@ -548,18 +548,9 @@ function DataView:IsFilled()
    return self._is_data_filled
 end
 
-function DataView:SetCuda()
-   self.log.trace('\t\t\t setcuda')
-   self.cuda = true
-end
 
 function DataView:GetInputTensor()
    if self:IsFilled() then
-      if self.cuda then
-         assert(torch.isTensor(self._input))
-         self.log.tracefrom('set tensor as cuda')
-         return self._input
-      end
       return self._input
    else
       error('not filled yet')

@@ -145,6 +145,10 @@ end
 function View:view()
    return self._view or ''
 end
+function View:GetDefaultViewStr()
+   assert(self._view)
+   return self._view
+end
 
 function View:SetViewStr(view)
     assert(torch.type(view) == 'string')

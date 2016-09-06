@@ -56,3 +56,20 @@ function CompositeFeedback:verbose(verbose)
       v:verbose(self._verbose)
    end
 end
+
+------------------------------------------------------------------
+-- return module which can be type converted
+------------------------------------------------------------------
+
+function CompositeFeedback:type(type)
+    if not type then
+        return self._feedbacks[1]:type()
+    else
+        for k, v in pairs(self._feedbacks) do
+            self.log.trace('convering: ', v)
+            assert(v:type())
+            self._feedbacks[k] = v:type(type)
+        end
+    end
+    self.log.trace('CompositeFeedback type as', type)
+end

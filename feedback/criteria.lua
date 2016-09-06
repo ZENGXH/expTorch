@@ -76,7 +76,8 @@ function Criteria:_add(batch, output,  report)
       -- current_error = v:forward(output.act:data(), batch:targets():data())
       self.log.trace('forward ', v)      
       local new_output = self._output_module[k]:forward(output)
-      current_error = v:forward(new_output, batch:targets():input())
+      local tgt = batch:GetView('target'):forwardGet('b', self.tensorType)
+      current_error = v:forward(new_output, tgt)
       self._errors[k] =  (
                               ( self._n_sample * self._errors[k] ) 
                               + 
@@ -96,4 +97,18 @@ function Criteria:report()
       [self:name()] = self._errors,
       n_sample = self._n_sample
    }
+end
+
+--------------------------------------------------------------
+-- make self. act like a table when calling type(new_type)
+--------------------------------------------------------------
+function Criteria:type(type)
+    assert(self._criteria and #self._criteria > 0, 'self_criterion empty')
+    if not type then
+        return torch.typename(self._criteria[1]) 
+    end
+    self.tensorType = type
+        for i = 1,  #self._criteria do 
+            self._criteria[i]:type(type)
+        end
 end

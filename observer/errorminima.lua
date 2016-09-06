@@ -80,12 +80,15 @@ function ErrorMinima:doneEpoch(report, ...)
          report_cursor = report_cursor[name]
       end
       self:compareError(report_cursor, ...)
+      print(report)
+      assert(report_cursor)
    end
 end
 
 function ErrorMinima:compareError(current_error, ...)
    -- if maximize is true, sign will be -1
    local found_minima = false
+   self.log.tracefrom(current_error)
    if type(current_error) == 'table' then
        self.log.fatal('ErrorMinima get table error, select the first one')
        print(current_error)

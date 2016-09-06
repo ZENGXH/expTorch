@@ -5,6 +5,9 @@
 -- To make your own training algorithm, you can build your own 
 -- propagator. If you can reduce it to reusable components, you could 
 -- then refactor these into visitors, observers, etc.
+-- typeconvertsion:
+--  if use cuda, the Propagator will do type conversion in forward 
+--  and backward
 ------------------------------------------------------------------------
 local Propagator = torch.class("dp.Propagator")
 Propagator.isPropagator = true
@@ -43,6 +46,7 @@ function Propagator:__init(config)
       {arg='n_display_interval', type='number', default=100, 
        help='display interval for experiment information in monitor'}
    )
+   self.tensorType = 'torch.FloatTensor' -- default 
    self.log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
    self.log.SetLoggerName(args.name)
    self:sampler(args.sampler or dp.Sampler())
@@ -198,12 +202,19 @@ function Propagator:propagateBatch(batch)
 end
 
 function Propagator:forward(batch)
+    --[[
    local input = batch:inputs():input()
    local target = batch:targets():input()
    if self.cuda == true then 
        input = input:cuda()
        target = target:cuda()
    end
+   ]]--
+   local input = batch:GetView('input'):GetInputTensor()
+   local target = batch:GetView('target'):GetInputTensor()
+   -- if self.cuda == true then
+       input = input:type(self.tensorType)
+       target = target:type(self.tensorType)
    target = self._target_module:forward(target)
    if self._include_target then
       input = {input, target}
@@ -388,16 +399,13 @@ end
 
 function Propagator:type(new_type)
    self.log.info('\t\t reset type as ', new_type)
-   if new_type == 'torch.CudaTensor' then
-      self.log.info('Propagator cuda set')
-      self.cuda = true
-      if self._sampler then
-         self._sampler:SetCuda()
-      end
-   end
    if self._loss then
-      self._loss:type(new_type)
+       self._loss:type(new_type)
    end
+   if self._feedback then
+       self._feedback:type(new_type)
+   end
+   self.tensorType = new_type
 end
 
 function Propagator:float()

@@ -56,12 +56,15 @@ function Optimizer:propagateBatch(batch, report)
 end
 
 function Optimizer:backward(batch)
-   local input = batch:inputs():input()
-   local target = batch:targets():input()
-   if self.cuda == true then
-       input = input:cuda()
-       target = target:cuda()
-   end
+   -- local input = batch:GetView('input'):forwardGet(batch:GetDefaultViewStr(), self.tensorType)
+   -- local target = batch:GetView('target'):forwardGet(batch:GetDefaultViewStr(), self.tensorType)
+
+   local input = batch:GetView('input'):GetInputTensor()
+   local target = batch:GetView('target'):GetInputTensor()
+   -- if self.cuda == true then
+       input = input:type(self.tensorType)
+       target = target:type(self.tensorType)
+   -- end
    target = self._target_module:forward(target)
    -- estimate gradient of loss w.r.t. outputs
    self.gradOutput = self._loss:backward(self.output, target)

@@ -37,9 +37,9 @@ end
 
 
 function Batch:SetCuda()
-    self.log.trace('\t\t SetCuda')
-    self:GetView('input'):SetCuda()
-    self:GetView('target'):SetCuda()
+    self.log.fatal('\t\t SetCuda, can be reremove?')
+    -- self:GetView('input'):SetCuda()
+    -- self:GetView('target'):SetCuda()
 end
 ------------------------------------------------------------------------
 -- setup/reset Batch's member:
