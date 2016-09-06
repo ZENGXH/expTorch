@@ -31,14 +31,12 @@ Sampler.isSampler = true
 --      whole data set size
 --  ppf: [optional] preprocesser
 --  gc_freq: int = 50
---  overwrite bool,??
 --  mediator
 ------------------------------------------------------------------------
 function Sampler:__init(config)
    config = config or {}
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args = {}
-   -- batch_size, epoch_size, ppf, gc_freq = xlua.unpack(
    dp.helper.unpack_config(args,{config},
       'Sampler', 
       'Samples batches from a set of examples in a dataset. '..
@@ -55,9 +53,6 @@ function Sampler:__init(config)
        help='a function that preprocesses a Batch into another Batch'},
       {arg='gc_freq', type='number', default=50,
        help='collectgarbage() every gc_freq batches'},
-      -- {arg='overwrite', type='boolean', default=false,
-      -- help='overwrite existing values if not nil.' .. 
-      -- 'If nil, initialize whatever the value of overwrite.'},
       {arg='mediator', type='dp.Mediator',
        help='used for communication between objects'}
  
@@ -79,11 +74,11 @@ function Sampler:__init(config)
       self._epoch_size = nil
    end
    self._mediator = args.mediator
-   log.info('[Sampler init done]')
    self._start = 1 -- init with 1
-   self.log.info('[init] Sampler batch_size=', self._batch_size, 
-   'epoch_size=', self._epoch_size, 'gc_freq=', self.gc_freq, 'has mediator: ', self._mediator==nil)
+   self.log.info('[init] Sampler batch_size=', self._batch_size, 'epoch_size=', 
+   self._epoch_size, 'gc_freq=', self.gc_freq, 'has mediator: ', self._mediator==nil)
    self.log.info('ppf: ', self._ppf)
+   log.info('[Sampler init done]')
 end
 
 ------------------------------------------------------------------------
@@ -129,6 +124,8 @@ end
 
 ------------------------------------------------------------------------
 -- get and set the batch_size and epoch_size
+-- batch_size: number of sample in each batch
+-- epoch_size: number of sample in each epoch
 ------------------------------------------------------------------------
 function Sampler:ResetBatchSize(batch_size)
    assert(torch.type(batch_size) ==  'number', batch_size)
@@ -143,7 +140,9 @@ end
 
 function Sampler:ResetEpochSize(epoch_size)
    assert(torch.type(epoch_size) ==  'number', epoch_size)
-    self._epoch_size = expoch_size
+   dp.helper.Assertlet(self:GetBatchSize(), epoch_size, 
+   'epoch_size need to larger than batch_size')
+   self._epoch_size = expoch_size
 end
 
 function Sampler:GetEpochsize()
@@ -158,17 +157,16 @@ function Sampler:collectgarbage()
       self._gc_n_batch = 0
    end
 end
------------------------------------------------------------------
--- type conversion for cuda
 
 -- change normal sampleEpoch to sampleEpochAsync
 function Sampler:async()
+   self.log.info('sampler async, set sampleEpoch as sampleEpochAsync')
    self.sampleEpoch = self.sampleEpochAsync
 end
 
 function Sampler:setup(config)
   self.log.tracefrom('')
-  self.log.fatal('depreciate') 
+  error('depreciate') 
   self.__init(config) -- redirect
 end
 

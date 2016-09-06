@@ -135,7 +135,7 @@ function Experiment:run(datasource, once)
             self._tester:propagateEpoch(test_set, report)
             self.log.trace('tester propagateEpoch done')
         end
-        self.log.info('collecting report')
+        self.log.trace('collecting report')
         report = self:report()
         self._mediator:publish("doneEpoch", report)
         atleastonce = true

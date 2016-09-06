@@ -94,45 +94,43 @@ end
 
 -- returns a tensor of shape view and type tensor_type
 -- return the module from the view and the 
-function DataView:tensorFromModule(view, tensor_type)
+function DataView:tensorFromModule(view, new_input_type)
    local viewTable = self._tensors[view] or {}
-   local input_type = torch.typename(self._input)
+   local original_input_type = torch.typename(self._input)
    local moduleTable = self._modules[view]
-
-   if not moduleTable then
+   if not moduleTable then -- i.e. no such view;
       -- no moduleTable: build a module
       local modula = self[view](self)
       -- make sure it accepts the right input type
       modula:type(self._type)
-      local copy = nn.Copy(input_type, tensor_type)
-      self._modules[view] = {modula, {[tensor_type] = copy}}
+      local copy2NewType = nn.Copy(original_input_type, new_input_type)
+      self._modules[view] = {
+        modula, -- self._input -> tensor in original_input_type, must id?
+        {[new_input_type] = copy2NewType} -- from ori->new type module
+      }
       local tensor = modula:forward(self._input)
-      viewTable[input_type] = tensor
-      tensor = copy:forward(tensor)
-      viewTable[tensor_type] = tensor
+      viewTable[original_input_type] = tensor
+      tensor = copy2NewType:forward(tensor)
+      viewTable[new_input_type] = tensor
       self._tensors[view] = viewTable
       return tensor
    end
 
    local modula, copierTable = unpack(moduleTable)
    local tensor = modula:forward(self._input)
-   viewTable[input_type] = tensor
-   local copier = copierTable[tensor_type]
-
-   if not copier then
+   viewTable[original_input_type] = tensor
+   if not copierTable[new_input_type] then
       -- no copier : build copier module
-      copier = nn.Copy(input_type, tensor_type)
-      copierTable[tensor_type] = copier
+      copierTable[new_input_type] = nn.Copy(original_input_type, new_input_type)
    end
-   
-   tensor = copier:forward(tensor)
-   viewTable[tensor_type] = tensor
+   local copy2NewType = copierTable[new_input_type]
+   tensor = copier:forward(copy2NewType)
+   viewTable[new_input_type] = tensor
    self._tensors[view] = viewTable
    return tensor
 end
 
 ------------------------ BACKWARD -------------------------
-
 -- This method could be called from multiple output Models
 function DataView:backwardPut(view, gradOutput)
    -- store gradOutput in list
@@ -155,9 +153,7 @@ function DataView:backwardGet(view, tensor_type)
          "forwarded input")
    end
    tensor_type = tensor_type or self._type
-   
    local view, gradOutput, gradInput
-   
    -- optimization : one-to-one backward
    if #self._gradOutputs == 1 then
       view, gradOutput = unpack(self._gradOutputs[1])

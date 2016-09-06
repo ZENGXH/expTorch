@@ -68,10 +68,11 @@ end
 function Feedback:add(batch, output, report)
     -- TODO: how to dead with output as table, tyoe conversion not working
     -- or conver the module of feedback?
+    --[[
    local feed_output = output
    if torch.type(output) == 'torch.CudaTensor' then
        feed_output = output:float()
-   end
+   end]]--
    self.log.trace('Feedback receiver report:', report)
    assert(torch.isTypeOf(batch, 'dp.Batch'), "First argument should be dp.Batch")
    self.num_batch_record = self.num_batch_record + 1
@@ -80,9 +81,9 @@ function Feedback:add(batch, output, report)
        error('deprecidate about selected_output')
        self.log.trace('selected_output is used')
        dp.helper.Assertlet(self.selected_output, #output, 'selected_output too large')
-       self:_add(batch, feed_output[self.selected_output], report)
+       self:_add(batch, output[self.selected_output], report)
     else
-        self:_add(batch, feed_output, report)
+        self:_add(batch, output, report)
     end
 end
 
@@ -128,32 +129,4 @@ function Feedback:cuda()
     self:type('torch.CudaTensor')
 end
 
--------------------------------------------------------------------
--- <>customer type conversion function for Feedback
--- recursiveType componend
--- add tensorType for batch:GetView('target'):forwardGet
-------------------------------------------------------------------
-function Feedback:GetModules()
-    error('abstract method need implement')
-end
 
-------------------------------------------------------------------
--- recursiveType can only works for table, nn.Module, Tensor
-------------------------------------------------------------------
---[[
-function Feedback:SetCuda()
-    assert(self.GetModules, ' sub class need to implement GetModules')
-    local get = self:GetModules()
-    local param = get
-    self.log.info('convert: ', get)
-  if torch.type(get) == 'table' then
-        for k, v in pairs(param) do
-        -- param[k] = nn.utils.recursiveType(v, type, tensorCache)
-           print(param[k])
-       end
-  else
-      print(torch.type(param), param)
-  end
-end
-
-]]--

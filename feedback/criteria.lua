@@ -50,12 +50,10 @@ function Criteria:__init(config)
          self._output_module[k] = args.output_module[k] or nn.Identity()
       -- end
    end
-   
    for i, v in ipairs(criteria) do
       -- for listed criteria, default name is derived from typename
       self._criteria[i] = v
    end
-   
    self._errors = {}
    self:reset()
    self.log.tracefrom('Criteria setup done')
@@ -65,7 +63,6 @@ function Criteria:_reset()
    -- reset error sums to zero
    self.log.info('resetting: ', self._criteria)
    for k, v in pairs(self._criteria) do
-      self.log.info('resetting: ', v)
       self._errors[k] = 0
    end
 end
@@ -76,7 +73,7 @@ function Criteria:_add(batch, output,  report)
       -- current_error = v:forward(output.act:data(), batch:targets():data())
       self.log.trace('forward ', v)      
       local new_output = self._output_module[k]:forward(output)
-      local tgt = batch:GetView('target'):forwardGet('b', self.tensorType)
+      local tgt = batch:GetView('target'):forwardGet('b'):type(self.tensorType)
       current_error = v:forward(new_output, tgt)
       self._errors[k] =  (
                               ( self._n_sample * self._errors[k] ) 

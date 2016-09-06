@@ -15,13 +15,12 @@ Propagator.isPropagator = true
 function Propagator:__init(config)   
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args = {} 
-   -- loss, callback, epoch_callback, sampler, observer, 
-   --   feedback, progress, verbose, stats = xlua.unpack(
    dp.helper.unpack_config(args, {config}, 'Propagator', 
       'Propagates Batches sampled from a DataSet using a Sampler '..
       'through a Model in order to evaluate a Loss, provide Feedback '.. 
       'or train the model',
-      {arg='name', type='string', default='propagator', help='name of the Propagator'},
+      {arg='name', type='string', default='propagator', 
+      help='name of the Propagator'},
       {arg='loss', type='nn.Criterion',
        help='a neural network Criterion to evaluate or minimize'},
       {arg='callback', type='function',
@@ -136,7 +135,6 @@ function Propagator:propagateEpoch(dataset, report)
       self._model:forget()
    end
    self._epoch_callback(self._model, report)
-   self._n_sample = 0
    -- create an sampler object in class Sampler
    self.log.trace('set up sampler interator: ')
    local sampler = self._sampler:sampleEpoch(dataset)
@@ -149,8 +147,7 @@ function Propagator:propagateEpoch(dataset, report)
       if batch then
          assert(torch.type(batch) == 'dp.Batch')
       end
-      self.log.trace('sampling batch')
-      batch, i, n = sampler(batch)
+      batch, nSampleRun, epochSize = sampler(batch)
       if not batch then -- fail?
          -- for aesthetics :
          if self._progress then
@@ -158,19 +155,14 @@ function Propagator:propagateEpoch(dataset, report)
          end
          break 
       end
-      self.nSample = i -- == min(nSampled, epochSize)
-      self.log.trace('call propagateBatch')
-      -- if Optimizer: 
-      --    forward + monitor + backward + callback + doneBatch
+      self.nSample = nSampleRun -- == min(nSampled, epochSize)
+      --    forward + monitor + [backward + ]callback + doneBatch
       self:propagateBatch(batch, report)
-
       
-      self.log.slience('receiver report: ', report)
       if self._progress then
-         -- display progress
-         xlua.progress(i, n)
+         xlua.progress(nSampleRun, epochSize)
       end
-      last_n = n
+      last_n = epochSize
       self.n_batch = self.n_batch + 1
    end
    -- time taken
@@ -179,7 +171,7 @@ function Propagator:propagateEpoch(dataset, report)
    self._example_speed = last_n / self._epoch_duration
    self._batch_speed = self.n_batch / self._epoch_duration
    if self._stats and self._verbose then
-      print("==> example speed = "..self._example_speed..' examples/s')
+      self.log.info("==> example speed = "..self._example_speed..' examples/s')
    end
 end      
 ---------------------------------------------------------------
@@ -194,30 +186,20 @@ function Propagator:propagateBatch(batch)
 end
 
 function Propagator:forward(batch)
-    --[[
-   local input = batch:inputs():input()
-   local target = batch:targets():input()
-   if self.cuda == true then 
-       input = input:cuda()
-       target = target:cuda()
-   end
-   ]]--
    local input = batch:GetView('input'):GetInputTensor()
    local target = batch:GetView('target'):GetInputTensor()
-   -- if self.cuda == true then
-       input = input:type(self.tensorType)
-       target = target:type(self.tensorType)
+   -- type conversion, corporate with :type(type)
+   input = input:type(self.tensorType)
+   target = target:type(self.tensorType)
    target = self._target_module:forward(target)
    if self._include_target then
-      input = {input, target}
+       input = {input, target}
    end
    -- useful for calling accUpdateGradParameters in callback function
    self._model.dpnn_input = input
-   log.trace('forward to model:.... ')   
    -- forward propagate through model
    self.output = self._model:forward(input)
    assert(self.output)
-   log.trace('\t forward done ')   
    if not self._loss then
       return
    end
@@ -231,7 +213,7 @@ end
 
 ----------------------------------------------------------
 -- add to feedback
--- sumErr
+-- self.sumErr, accumulated error over all the batch sent to monitor
 -- publish to mediator
 -- @param batch
 -- @param report: table
@@ -242,7 +224,7 @@ function Propagator:monitor(batch, report)
    end
    self.log.trace('monitoring')
    self.sumErr = self.sumErr + (self.err or 0)
-   -- monitor error and such
+   -- feed batch need to be called before observer 
    if self._feedback then
        -- call _add of the read feedback object
       self._feedback:add(batch, self.output, report)
@@ -253,26 +235,29 @@ function Propagator:monitor(batch, report)
    --publish report for this optimizer
    -- [[ add observer ?]]
    self._mediator:publish(self:name()..':'.."doneFeedback", report, batch)
-   
 end
 
-function Propagator:doneBatch(report)   
+function Propagator:doneBatch(report)
    --publish report for this optimizer
    self._mediator:publish(self:name()..':'.."doneBatch", report)
 end
 
+---------------------------------------------------------------------------
+--[[ Epoch report ]]--
 -- returns a log for the current epoch, in the format of a table
 -- or we could create an EpochLog class to help with this.
 -- But a table is more flexible. The advantage over pylearn2 is that 
 -- the log of an epoch is structured, as opposed to just a list of 
 -- channel names and values. Furthermore, values can be anything 
 -- serializable.
+---------------------------------------------------------------------------
 function Propagator:report()
    local avgErr
    if self._loss and self.sumErr and self.nSample > 0 then
-      avgErr = self.sumErr/self.nSample
+      avgErr = self.sumErr / self.nSample
       if self._verbose then
-         print(self:id():toString()..':loss avgErr '..avgErr)
+         -- self:id():toString()
+         self.log.info(string.format('epoch loss avgErr %.4f', avgErr))
       end
    end
    local report = {

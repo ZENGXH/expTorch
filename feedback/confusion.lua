@@ -40,7 +40,7 @@ end
 
 function Confusion:doneEpoch(report)
    if self._cm and self._verbose then
-      print(self._id:toString().." accuracy = "..self._cm.totalValid)
+      self.log.trace(self._id:toString().." accuracy = "..self._cm.totalValid)
    end
 end
 
@@ -64,12 +64,10 @@ function Confusion:_add(batch, output, report)
        self:InitCm(batch)
    end
    local act = self._bce and output:view(-1) or output:view(output:size(1), -1)
-   local tgt = batch:GetView('target'):forwardGet('b', self.tensorType)
-
+   local tgt = batch:GetView('target'):forwardGet('b'):type(self.tensorType)
    if self._target_dim >0 then
       tgt=tgt[self._target_dim]
    end
-   
    if self._bce then -- use binary cross entropy
       self._act = self._act or act.new()
       self._tgt = self._tgt or tgt.new()
@@ -80,7 +78,6 @@ function Confusion:_add(batch, output, report)
       act = self._act
       tgt = self._tgt
    end
-
    if not (torch.isTypeOf(act,'torch.FloatTensor') or torch.isTypeOf(act, 'torch.DoubleTensor') or torch.isTypeOf(act, 'torch.CudaTensor')) then
       self._actf = self.actf or torch.FloatTensor()
       self._actf:resize(act:size()):copy(act)
