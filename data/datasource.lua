@@ -9,7 +9,7 @@
 -- -- -- com of dataView(ImageVIew, ClassView, ListView...) is [which_set] like string 'train' & [data] torch.Tensor which is filled by calling `forward`
 --
 ------------------------------------------------------------------------
-local DataSource = torch.class("dp.DataSource")
+local DataSource, parent = torch.class("dp.DataSource", "dp.Module")
 DataSource.isDataSource = true
 
 function DataSource:__init(config)
@@ -53,8 +53,9 @@ function DataSource:__init(config)
 
    local input_preprocess = args.input_preprocess
    local target_preprocess = args.target_preprocess
-   self.log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.SetLoggerName(name)
+   parent.__init(self, args)
+   -- self.log:= dp.log() --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   -- self.log:SetLoggerName(name)
    --preprocessing
    self:inputPreprocess(input_preprocess)
    self:targetPreprocess(target_preprocess)
@@ -70,7 +71,7 @@ end
 -- usage: getView('train', 'input')
 ------------------------------------------------------------------------
 function DataSource:GetView(which_set, attribute)
-   self.log.trace('getView ', which_set, ' attribute: ', attribute)
+   self.log:trace('getView ', which_set, ' attribute: ', attribute)
    local which_set = which_set or 'train'
    local attribute = attribute or 'input'
    local dataset
@@ -177,15 +178,15 @@ end
 function DataSource:SetOrGetAttributeSet(data_set, attribute)
    assert(attribute == 'train' or attribute == 'valid' or attribute == 'test', 'invalid attribute argument '..attribute)
    if data_set then -- set
-       self.log.trace('[ds] set data_set '..attribute)
+       self.log:trace('[ds] set data_set '..attribute)
        return self:SetAttributeSet(data_set, attribute)
    end -- if data_set
    -- get
-   self.log.tracefromfrom('[ds] request data_set '..attribute)
+   self.log:tracefromfrom('[ds] request data_set '..attribute)
    if self['_has_'..attribute..'_set'] then
        return self:GetAttributeSet(attribute)
    else
-       self.log.error(attribute..' set is not setted')
+       self.log:error(attribute..' set is not setted')
        return nil
    end -- if self._has_[attribute]_set 
 end
@@ -208,10 +209,9 @@ end
 ------------------------------------------------------------------------
 function DataSource:GetAttributeSet(attribute)
     assert(attribute == 'train' or attribute == 'valid' or attribute == 'test')
-    local data_set = self['_'..attribute..'_set']
-    self.log.tracefromfrom('requiring attributes from ')
-    assert(data_set and data_set.isDataSet, 'empty return '..attribute)
-    return data_set
+    self.log:tracefromfrom('requiring attributes from ')
+    -- assert(self['_'..attribute..'_set'] and self['_'..attribute..'_set'].isDataSet, 'empty return '..attribute)
+    return self['_'..attribute..'_set']
 end
 
 function DataSource:GetValidSet()
@@ -234,6 +234,10 @@ function DataSource:SetAttributeSet(data_set, attribute)
     self['_'..attribute..'_set'] = data_set
     self['_has_'..attribute..'_set'] = true
     return data_set
+end
+
+function DataSource:ShuffleAttributeSet(attribute)
+    error('abstract method, not support')
 end
 
 function DataSource:SetTrainSet(train_set)

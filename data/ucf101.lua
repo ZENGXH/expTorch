@@ -22,6 +22,8 @@ function UCF101:__init(config)
         help='dataList contain all the filename, length, label'},
         {arg='data_test_list', type='string', req=true, help='list for all video'},
         {arg='data_train_list', type='string', req=true, help='list for all video'},
+        {arg='shuffle_train_data', type='boolean', req=true, help='shuffle_train_data if true'},
+        {arg='shuffle_test_data', type='boolean', req=true, help='shuffle_train_data if true'},
         {arg='data_root', type='string', default=dp.DATA_DIR,
         help='root of datadir'},
         {arg='data_folder', type='string', req=true, help='folder name of the datas'},
@@ -37,6 +39,8 @@ function UCF101:__init(config)
         {arg='verbose', type='boolean', default=true, help='Verbose mode during initialization'},
         {arg='load_all', type='boolean', 
         help='Load all datasets : train and valid', default=true},
+        {arg='is_test_only', type='boolean', default=false,
+        help='do not run train if true'},
         {arg='cache_mode', type='string', default='writeonce',
         help='writeonce : read from cache if exists, else write to cache. '..
         'overwrite : write to cache, regardless if exists. '..
@@ -59,7 +63,7 @@ function UCF101:__init(config)
     self._cache_mode = args.cache_mode
  
     self._image_size = self._sample_size
-    self.log.info('frames_per_select_train: ', args.frames_per_select_train, ' frames_per_select_test ', self.frames_per_select_test)
+    self.log:info('frames_per_select_train: ', args.frames_per_select_train, ' frames_per_select_test ', self.frames_per_select_test)
     self.log.info('ucf101 load_size: ', unpack(self._load_size), ' sample_size ', unpack(self._sample_size), 'image_size', unpack(self._image_size))
     self._feature_size = self._sample_size[1]*self._sample_size[2]*self._sample_size[3]
     
@@ -68,14 +72,23 @@ function UCF101:__init(config)
     self._meta_path=paths.concat(data_root, 'ucf101_'..input_type, 'metadata', data_folder)
     self._io_helper=loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'ucf101_helper.lua'))()
 
+    self.is_test_only = args.is_test_only
     if load_all then
         self.log.trace('[ds] UCF101 load all:Train, Valid and Meta')
-        self:loadTrain()
+        if not self.is_test_only then
+            self:loadTrain()
+        end
         self:loadTest()
         -- self:loadValid()
         -- self:loadMeta()
     else
         self.log.info('not load all, call loadTrain | loadValid | youself')
+    end
+    if args.shuffle_train_data then
+        self:ShuffleAttributeSet('train')
+    end
+    if args.shuffle_test_data then
+        self:ShuffleAttributeSet('test')
     end
     self.log.info('[UCF101 DataSource] init done')
 end
@@ -104,7 +117,17 @@ function UCF101:loadTrain()
     self.log.info('[ds] UCF101 loadTrain done')
     return dataset
 end
-
+------------------------------------------------------------------
+-- VideoClassSet support shuffle
+------------------------------------------------------------------
+function UCF101:ShuffleAttributeSet(attribute)
+    if not self:GetAttributeSet(attribute) then
+        self.log.fatal('empty dataset ', attribute)
+        return 
+    else
+       self:GetAttributeSet(attribute):Shuffle()
+   end
+end
 function UCF101:loadValid()
     self.log.trace('loadvalid')
     assert(self.frames_per_select_train)
