@@ -40,7 +40,7 @@ end
 
 function Confusion:doneEpoch(report)
    if self._cm and self._verbose then
-      self.log.trace(self._id:toString().." accuracy = "..self._cm.totalValid)
+      self.log:trace(self._id:toString().." accuracy = "..self._cm.totalValid)
    end
 end
 
@@ -48,7 +48,7 @@ function Confusion:InitCm(batch)
       if self._bce then
          self._cm = optim.ConfusionMatrix({0,1})
       else
-         self.log.info('init ConfusionMatrix: with number of classes: ', 
+         self.log:info('init ConfusionMatrix: with number of classes: ', 
             #batch:GetView('targets'):classes())
          self._cm = optim.ConfusionMatrix(batch:GetView('target'):classes())
       end
@@ -88,7 +88,7 @@ function Confusion:_add(batch, output, report)
    if self._cm then
       self._cm:updateValids()
       report.batch_acc = self._cm.totalValid
-      self.log.trace('acc: ', self._cm.totalValid)
+      self.log:trace('acc: ', self._cm.totalValid)
    end
 end
 
@@ -107,7 +107,7 @@ function Confusion:report()
    --union means divide valid classification by sum of rows and cols
    -- (as opposed to just cols.) minus valid classificaiton 
    -- (which is included in each sum)
-   self.log.slience('get acc: ', cm.totalValid)
+   self.log:slience('get acc: ', cm.totalValid)
    return { 
       [self:name()] = {
          matrix = cm.mat,

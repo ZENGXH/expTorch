@@ -75,9 +75,7 @@ function VideoClassSet:__init(config)
     )
     -- globals
     -- gm = require 'graphicsmagick'
-
     -- locals
-    
     self._load_size = args.load_size
     self._sample_size = args.sample_size or self._load_size
     self._verbose = args.verbose   
@@ -112,7 +110,7 @@ function VideoClassSet:__init(config)
         'invalid cache_mode :'..args.cache_mode)
 
     parent.__init(self, config)
-    self.log.info('[videoclassset] _load_size:', unpack(self._load_size),
+    self.log:info('[videoclassset] _load_size:', unpack(self._load_size),
     '[frames_per_select=', self.frames_per_select,
     '[_sample_size=', unpack(self._sample_size),
     '[_verbose=', self._verbose,
@@ -121,7 +119,7 @@ function VideoClassSet:__init(config)
     '[_data_path=', self._data_path[1],
     '[ get sample_func=', self.sample_func)
  
-    -- self.log.info('__init VideoClassSet', unpack(config))
+    -- self.log:info('__init VideoClassSet', unpack(config))
     -- build index in parent
     self._index_loaded = false
     local cacheExists = paths.filep(self._cache_path)
@@ -129,14 +127,15 @@ function VideoClassSet:__init(config)
         if not cacheExists then
             error"'readonly' cache_mode requires an existing cache, none found"
         end
-        self.log.info('\t cacheExists, loadIndex')
+        self.log:info('\t cacheExists, loadIndex')
         self:LoadIndex()
     else
         self:BuildIndex()
     end
 
-    self.log.info('building list_video_index for size: ', self:GetNumOfVideo())
+    self.log:info('building list_video_index for size: ', self:GetNumOfVideo())
     self.list_video_index = torch.range(1, self:GetNumOfVideo())
+    self:Shuffle()
     self.is_shuffle = false
     -- required for multi-threading
     self._config = config 
@@ -148,12 +147,12 @@ function VideoClassSet:nSample()
 end
 
 function VideoClassSet:SaveIndex(info)
-    self.log.info('[SaveIndex] in ', self._cache_path, ' after build')
+    self.log:info('[SaveIndex] in ', self._cache_path, ' after build')
     torch.save(self._cache_path, info)
 end
 
 function VideoClassSet:LoadIndex()
-    self.log.info('[loadIndex] from ', self._cache_path, ' after build')
+    self.log:info('[loadIndex] from ', self._cache_path, ' after build')
     local index = torch.load(self._cache_path)
     for k, v in pairs(index) do
         self[k] = v
@@ -161,7 +160,7 @@ function VideoClassSet:LoadIndex()
     self._n_sample = #self.videoIdVideoPath
     self._n_label = #self._classes
     self._n_frame = torch.Tensor(self.videoLength):sum()
-    self.log.info(string.format('[VideoClassSet] BuildIndex done, get #samples %d, #video %d, #frames %d intotal', self._n_sample, self._n_label, self._n_frame))
+    self.log:info(string.format('[VideoClassSet] BuildIndex done, get #samples %d, #video %d, #frames %d intotal', self._n_sample, self._n_label, self._n_frame))
     self._index_loaded = true
 end
 ------------------------------------------------------------------------
@@ -189,13 +188,13 @@ function VideoClassSet:BuildIndex()
     self:LoadIndex() -- load into self
 
     local lengthListTensor = torch.Tensor(self.videoLength)
-    self.log.info("found " .. #self._classes .. " classes")
-    self.log.info("#video: "..#self.videoIdVideoPath, ' min length = ', lengthListTensor:min())
+    self.log:info("found " .. #self._classes .. " classes")
+    self.log:info("#video: "..#self.videoIdVideoPath, ' min length = ', lengthListTensor:min())
   ---------------------------------------------------------------------
     -- find the image path names
    ---------------------------------------------------------------------
     if self._verbose then
-        self.log.info('Updating classes and videoLabel appropriately')
+        self.log:info('Updating classes and videoLabel appropriately')
     end
     self._index_loaded = true
 end
@@ -213,7 +212,7 @@ end
 
 function VideoClassSet:Shuffle()
     self.list_video_index = torch.Tensor():randperm(self:GetNumOfVideo())
-    self.log.info('shuffle done')
+    self.log:info('shuffle done')
     self.is_shuffle = true
 end
 
@@ -331,7 +330,7 @@ function VideoClassSet:_SubTableToTensor(inputTable, targetTable,
     -- inputTensor possible shape: (t, c, h, w) or (t, c) or (1, c, h, w) or (1, c) or (c) or (c, h, w)
     -- inputTensor = torch.FloatTensor()
     -- targetTensor = targetTensor or torch.IntTensor()
-    self.log.trace('size of inputTensor ', dp.helper.PrintSize(inputTensor), 
+    self.log:trace('size of inputTensor ', dp.helper.PrintSize(inputTensor), 
         ' and inputTable[1][1] ', dp.helper.PrintSize(inputTable[1]))
     assert(inputTensor and 
     inputTensor[1]:isSameSizeAs(inputTable[1]), 'shape mis match')
@@ -344,7 +343,7 @@ function VideoClassSet:_SubTableToTensor(inputTable, targetTable,
     for i = 1, num_sample do
         targetTensor[i] = targetTable[i]
     end
-    self.log.trace('_SubTableToTensor return: size ', 
+    self.log:trace('_SubTableToTensor return: size ', 
         dp.helper.PrintSize(inputTensor))
     return inputTensor, targetTensor
 end
@@ -362,12 +361,12 @@ function VideoClassSet:_FillBatch(tbatch, inputSubTable, targetSubTable)
         targetSubTable, inputTensor, targetTensor)
     -- assert(inputTensor:size(2) == 3)
     -- batch:SetView('input', dp.VideoView
-    self.log.trace('calling dataview forward')
+    self.log:trace('calling dataview forward')
     tbatch:GetView('input'):forwardPut(self._input_shape, inputTensor)
     tbatch:GetView('target'):forwardPut(self._output_shape, targetTensor)
     tbatch:GetView('target'):setClasses(self._classes)
     collectgarbage()
-    self.log.trace('[sample] done, return batch')
+    self.log:trace('[sample] done, return batch')
     return tbatch
 end
 
@@ -387,17 +386,17 @@ function VideoClassSet:_GetRandomSample(nSample, inputTable, targetTable)
   for i = 1, nSample do
         -- sample class(label)
         local index_class = torch.random(1, #self._classes)
-        self.log.trace('select index_class ', index_class, 
+        self.log:trace('select index_class ', index_class, 
             ' has video: ', #self.classIndexVideoTableList[index_class])
         -- sample video from class
         local index_in_class_ran = torch.random(1, 
             #self.classIndexVideoTableList[index_class])
         local index_video = self.classIndexVideoTableListIndices[
             index_class][index_in_class_ran]
-        self.log.trace('select index_in_class_ran ', index_in_class_ran, 
+        self.log:trace('select index_in_class_ran ', index_in_class_ran, 
             ' index_video: ', index_video)    
         local videoPath = self.videoIdVideoPath[index_video]
-        self.log.trace('get videopath: ', videoPath)
+        self.log:trace('get videopath: ', videoPath)
         local dst = self:GetImageBuffer(i)
         dst = self:LoadData5DRandomFunc(self, dst, videoPath) 
         -- enlarge size from 4d to 5d
@@ -421,15 +420,18 @@ end
 function VideoClassSet:_GetOrderSample5D(start, stop, 
     inputTable, targetTable)
     dp.helper.Assertlet(stop, self.list_video_index:nElement(), 'nSample: '..self:nSample())
-  self.log.trace('GetOrdersampling iter ')
+  self.log:trace('GetOrdersampling iter ')
   for i = 1, stop - start + 1 do
-        self.log.trace('inserting')
+        self.log:trace('inserting')
         -- sample video from class
         -- local index_in_class_ran = torch.random(1, 
         local index_video = self.list_video_index[i]
         local index_class = self.videoIdClassId[index_video]
         local videoPath = self.videoIdVideoPath[index_video]
-        self.log.trace('select index_class ', index_class, 
+        if(i < 20) then
+            -- self.log.info('index_class: ', index_video)
+        end
+        self.log:trace('select index_class ', index_class, 
             ' index_video: ', index_video, 'get videopath: ', videoPath)
         local dst = self:GetImageBuffer(i):view(1, self.frames_per_select, unpack(self._sample_size))
         dst = self:_LoadData5DRandomCropFunc(videoPath, dst) 
@@ -437,7 +439,7 @@ function VideoClassSet:_GetOrderSample5D(start, stop,
         table.insert(inputTable, dst)
         table.insert(targetTable, index_class)  
     end
-    self.log.trace('return table size ', #inputTable)
+    self.log:trace('return table size ', #inputTable)
     return inputTable, targetTable
 end
 
@@ -458,10 +460,10 @@ end
 -- @return dst in 5D view: torch.Tensor
 -----------------------------------------------------------------------
 function VideoClassSet:_LoadData5DRandomCropFunc(path, dst)
-    self.log.trace('receive path ', path, self._data_path[1])
+    self.log:trace('receive path ', path, self._data_path[1])
     assert(self.frames_per_select, 'frames_per_select must be set!')
     local video_path = paths.concat(self._data_path[1], path)
-    self.log.trace('[loadVideo] ', video_path)
+    self.log:trace('[loadVideo] ', video_path)
     local out = torch.load(video_path).data
     local num_frames = #out
     assert(num_frames >= self.frames_per_select, 'get num_frames '..num_frames..
@@ -530,24 +532,22 @@ end
 ------------------------------------------------------
 -- load the data from path into tensor
 -- ByDefault load the whole videoPath
---
 -- @param dst, torch.Tensor()
 -- @param videoPath, dataPath of the data
--- 
 -- @return data torch.Tensor
 -----------------------------------------------------
 -- return a table contain all frames of the video 
 function VideoClassSet:loadVideo(path)
-    self.log.fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
+    self.log:fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
     local video_path = paths.concat(self._data_path[1], path)
-    self.log.trace('[loadVideo] ', video_path)
+    self.log:trace('[loadVideo] ', video_path)
     local concat = torch.load(video_path)
     local data = concat.data
     return data
 end
 
 function VideoClassSet:LoadData(videoPath) 
-    self.log.fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
+    self.log:fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
     -- enlarge size from 4d to 5d
     -- #TODO: checking?
     return self:loadVideo(path)
@@ -555,7 +555,7 @@ function VideoClassSet:LoadData(videoPath)
 end
 
 function VideoClassSet:loadImage(path)
-    self.log.fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
+    self.log:fatal('DEPRECATED, put into _LoadData5DRandomCropFunc')
     return self:loadVideo(path)
 end
 

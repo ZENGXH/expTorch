@@ -5,15 +5,15 @@
 -- the principle is that the [view] and torch.Tensor data are binding together
 -- in the view class
 ------------------------------------------------------------------------
-local View = torch.class("dp.View")
+local View, parent = torch.class("dp.View", "dp.Module")
 View.isView = true
 
 function View:__init(name)
    -- caches
    local name = name or 'view'
-   self.log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.trace('[init] view with name ', name)
-   self.log.SetLoggerName(name)
+   self.log = dp.log() --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   self.log:trace('[init] view with name ', name)
+   self.log:SetLoggerName(name)
    self._tensors = {}
    self._warn = false
 end
@@ -31,10 +31,10 @@ function View:forward(view, inputORtype)
    view = view or 'default'
    local arg_type = getType(inputORtype)
    if arg_type == 'string' or arg_type == 'nil' then
-      self.log.trace('{view} forward GET view: ', view, inputORtype)
+      self.log:trace('{view} forward GET view: ', view, inputORtype)
       return self:forwardGet(view, inputORtype)
   end
-   self.log.trace('{view} forward PUT view: ', view, ' with tensor: ', dp.helper.PrintSize(inputORtype))
+   self.log:trace('{view} forward PUT view: ', view, ' with tensor: ', dp.helper.PrintSize(inputORtype))
    return self:forwardPut(view, inputORtype)
 end
 

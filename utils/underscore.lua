@@ -53,6 +53,5 @@ function _.split(value, pattern)
   if start <= string.len(value) then
     table.insert(values, string.sub(value, start))
   end
-    
   return values
 end

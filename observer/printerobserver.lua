@@ -9,7 +9,6 @@
 local PrinterObserver, parent = torch.class('dp.PrinterObserver' , 'dp.Observer')
 
 function PrinterObserver:__init(config)
-
     local args = {}
     dp.helper.unpack_config(args, 
     {config},
@@ -23,14 +22,12 @@ function PrinterObserver:__init(config)
     parent.__init(self, config)
 
     self._print_report = {'batch_acc', 'batch_err'}
-   self.log = dp.log --  loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.SetLoggerName(args.name)
-   self.display_interval = args.display_interval
-   self.batch_counter = 0
-   self.loss_all = 0
-   self.acc_all = 0
-   self.loss_interval_table = {}
-   self.acc_interval_table = {}
+    self.display_interval = args.display_interval
+    self.batch_counter = 0
+    self.loss_all = 0
+    self.acc_all = 0
+    self.loss_interval_table = {}
+    self.acc_interval_table = {}
 end
 
 function PrinterObserver:doneBatch(report)
@@ -57,7 +54,7 @@ function PrinterObserver:display()
     local ave_loss = torch.Tensor(self.loss_interval_table):mean()
     self.acc_interval_table = {}
     self.loss_interval_table = {}
-    self.log.info(
-        string.format('donebatch, get acc: %.4f and loss %.4f', ave_acc, ave_loss)
-        )
+    self.log:info(
+    string.format('acc: %s%.4f%s and loss %.4f', sys.COLORS.red, ave_acc,sys.COLORS.none, ave_loss)
+    )
 end

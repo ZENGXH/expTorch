@@ -8,7 +8,7 @@
 -- both dataset and batch have inputView and targetView, and Preprocesses
 -- 
 ------------------------------------------------------------------------
-local BaseSet = torch.class("dp.BaseSet")
+local BaseSet, parent = torch.class("dp.BaseSet", "dp.Module")
 BaseSet.isBaseSet = true
 
 ------------------------------------------------------------------------
@@ -42,16 +42,17 @@ function BaseSet:__init(config)
        'to a ListView. The indices of examples must be '..
        'in both inputs and targets must be aligned.'}
    )
-   self.log = dp.log -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.SetLoggerName(args.name)
+   parent.__init(self, args)
+   -- self.log= dp.log() -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   -- self.log:SetLoggerName(args.name)
    self:whichSet(args.which_set)
    self._has_target_view = false
    if args.inputs then 
-       self.log.fatal('set inputs explictly please')
+       self.log:fatal('set inputs explictly please')
        self:SetView('inputs', args.inputs)
    end
    if args.targets then 
-       self.log.fatal('set targets explictly please')
+       self.log:fatal('set targets explictly please')
        self:SetView('targets', args.targets)
    end
 end
@@ -88,14 +89,14 @@ function BaseSet:GetView(attribute)
    assert(attribute, 'attribute nil')
    if attribute == 'inputs' or attribute == 'input' then
       if not self._has_input_view then 
-         self.log.tracefrom('\t get nil') 
+         self.log:tracefrom('\t get nil') 
          return nil
       else
          return self._inputs
       end
    elseif attribute == 'target' or attribute == 'targets' then
       if not self._has_target_view then 
-         self.log.tracefrom('\t get nil') 
+         self.log:tracefrom('\t get nil') 
          return nil
       else
          return self._targets
@@ -164,16 +165,16 @@ end
 ---------------------------------------------------------------
 -- become DEPRECATED
 function BaseSet:preprocess(config)
-    self.log.fatal('DEPRECATED cann SetPreprocess instead')
+    self.log:fatal('DEPRECATED cann SetPreprocess instead')
     return self:SetPreprocess(config)
 end
 
 function BaseSet:inputs(inputs)
    if inputs then
-      self.log.tracefrom('set dataView: inputs')
+      self.log:tracefrom('set dataView: inputs')
       return self:SetView('input', inputs)
    else
-      self.log.tracefrom('request dataView: inputs')
+      self.log:tracefrom('request dataView: inputs')
       return self:GetView('input')
    end
 end
@@ -181,10 +182,10 @@ end
 -- get/set target dp.View
 function BaseSet:targets(targets)
    if targets then
-      self.log.tracefrom('set dataView: targets')
+      self.log:tracefrom('set dataView: targets')
       return self:SetView('target', targets)
    end
-   self.log.tracefrom('request dataView: targets')
+   self.log:tracefrom('request dataView: targets')
    return self:GetView('target')
 end
 -- BEGIN DEPRECATED (June 13, 2015)

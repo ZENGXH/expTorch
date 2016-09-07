@@ -18,7 +18,7 @@
 -- without putting data into the batch in the iterator
 -- TODO add fix_batch_size flags?
 ------------------------------------------------------------------------
-local Sampler = torch.class("dp.Sampler")
+local Sampler, parent = torch.class("dp.Sampler", "dp.Module")
 Sampler.isSampler = true
 
 ------------------------------------------------------------------------
@@ -55,13 +55,13 @@ function Sampler:__init(config)
        help='collectgarbage() every gc_freq batches'},
       {arg='mediator', type='dp.Mediator',
        help='used for communication between objects'}
- 
    )
-   self.log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.SetLoggerName(args.name)
+   parent.__init(self, args)
+   --self.log:= dp.log() --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   --self.log:SetLoggerName(args.name)
    self._ppf = args.ppf or function(batch) 
         return batch 
-    end
+   end
    self._gc_freq = args.gc_freq
    self:ResetBatchSize(args.batch_size)
    self._epoch_size = (args.epoch_size > 0 and args.epoch_size) or nil
@@ -75,10 +75,10 @@ function Sampler:__init(config)
    end
    self._mediator = args.mediator
    self._start = 1 -- init with 1
-   self.log.info('[init] Sampler batch_size=', self._batch_size, 'epoch_size=', 
+   self.log:info('[init] Sampler batch_size=', self._batch_size, 'epoch_size=', 
    self._epoch_size, 'gc_freq=', self.gc_freq, 'has mediator: ', self._mediator==nil)
-   self.log.info('ppf: ', self._ppf)
-   self.log.info('[Sampler init done]')
+   self.log:info('ppf: ', self._ppf)
+   self.log:info('[Sampler init done]')
 end
 
 ------------------------------------------------------------------------
@@ -130,7 +130,7 @@ end
 function Sampler:ResetBatchSize(batch_size)
    assert(torch.type(batch_size) ==  'number', batch_size)
    assert(batch_size > 0, 'get batch_size '..tostring(batch_size))
-   self.log.info('set batch_size as ', batch_size)
+   self.log:info('set batch_size as ', batch_size)
    self._batch_size = batch_size
 end
 
@@ -160,23 +160,23 @@ end
 
 -- change normal sampleEpoch to sampleEpochAsync
 function Sampler:async()
-   self.log.info('sampler async, set sampleEpoch as sampleEpochAsync')
+   self.log:info('sampler async, set sampleEpoch as sampleEpochAsync')
    self.sampleEpoch = self.sampleEpochAsync
 end
 
 function Sampler:setup(config)
-  self.log.tracefrom('')
+  self.log:tracefrom('')
   error('depreciate') 
   self.__init(config) -- redirect
 end
 
 function Sampler:setBatchSize(batch_size)
-   self.log.fatal('depreciated')
+   self.log:fatal('depreciated')
    return self:ResetBatchSize(batch_size)
 end
 
 function Sampler:batchSize()
-   self.log.fatal('depreciated')
+   self.log:fatal('depreciated')
    return self:GetBatchSize()
 end
 

@@ -9,7 +9,7 @@
 --  if use cuda, the Propagator will do type conversion in forward 
 --  and backward
 ------------------------------------------------------------------------
-local Propagator = torch.class("dp.Propagator")
+local Propagator, parent = torch.class("dp.Propagator", "dp.Module")
 Propagator.isPropagator = true
 
 function Propagator:__init(config)   
@@ -46,8 +46,9 @@ function Propagator:__init(config)
        help='display interval for experiment information in monitor'}
    )
    self.tensorType = dp.DefaultTensorType -- 'torch.DoubleTensor' -- by default
-   self.log = dp.log -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.SetLoggerName(args.name)
+   -- self.log:= dp.log() -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   -- self.log:SetLoggerName(args.name)
+   parent.__init(self, args)
    self:sampler(args.sampler or dp.Sampler())
    self:loss(args.loss) -- setup Criterion
    self:observer(args.observer)
@@ -114,10 +115,10 @@ end
 -- pass model and report to self._epoch_callback()
 -- call propagateBatch recurrently
 function Propagator:propagateEpoch(dataset, report)
-   self.log.trace('propagating: ')
+   self.log:trace('propagating: ')
    self.sumErr = 0
    if self._feedback then
-      self.log.trace('reset feedback ')
+      self.log:trace('reset feedback ')
       self._feedback:reset()
    end
    -- local vars
@@ -130,13 +131,13 @@ function Propagator:propagateEpoch(dataset, report)
    end
 
    if self._model.forget then
-       self.log.trace('calling forget')
+       self.log:trace('calling forget')
       -- for recurrent modules, forget between epochs
       self._model:forget()
    end
    self._epoch_callback(self._model, report)
    -- create an sampler object in class Sampler
-   self.log.trace('set up sampler interator: ')
+   self.log:info('set up sampler interator: ')
    local sampler = self._sampler:sampleEpoch(dataset)
    if not report or report == nil then
        report = {}
@@ -171,7 +172,7 @@ function Propagator:propagateEpoch(dataset, report)
    self._example_speed = last_n / self._epoch_duration
    self._batch_speed = self.n_batch / self._epoch_duration
    if self._stats and self._verbose then
-      self.log.info("==> example speed = "..self._example_speed..' examples/s')
+      self.log:trace("==> example speed = "..self._example_speed..' examples/s')
    end
 end      
 ---------------------------------------------------------------
@@ -205,9 +206,9 @@ function Propagator:forward(batch)
    end
    self._loss = self._loss
    -- measure loss
-   self.log.slience('Propagator forward: input, target', 
+   self.log:slience('Propagator forward: input, target', 
       input:type(), target:type())
-   self.log.slience('Pceropagator forward: output', self.output)
+   self.log:slience('Pceropagator forward: output', self.output)
    self.err = self._loss:forward(self.output, target)
 end
 
@@ -222,7 +223,7 @@ function Propagator:monitor(batch, report)
    if not report or report == nil then
        report = {}
    end
-   self.log.trace('monitoring')
+   self.log:trace('monitoring')
    self.sumErr = self.sumErr + (self.err or 0)
    -- feed batch need to be called before observer 
    if self._feedback then
@@ -257,7 +258,7 @@ function Propagator:report()
       avgErr = self.sumErr / self.nSample
       if self._verbose then
          -- self:id():toString()
-         self.log.info(string.format('epoch loss avgErr %.4f', avgErr))
+         self.log:info(string.format('epoch loss avgErr %.4f', avgErr))
       end
    end
    local report = {
@@ -375,7 +376,7 @@ function Propagator:silent()
 end
 
 function Propagator:type(new_type)
-   self.log.info('\t\t reset type as ', new_type)
+   self.log:info('\t\t reset type as ', new_type)
    if self._loss then
        self._loss:type(new_type)
    end

@@ -32,7 +32,7 @@ function InorderSampler:sampleEpoch(dataset)
    assert(dataset.isDataSet)
    local nSample = dataset:nSample()
    if not self._epoch_size then 
-       self.log.error('epoch size not set! set to be nSample', nSample)
+       self.log:error('epoch size not set! set to be nSample', nSample)
        self._epoch_size = nSample 
    end
    local epochSize = self._epoch_size 
@@ -44,7 +44,7 @@ function InorderSampler:sampleEpoch(dataset)
    -- return batch, min(nSampled, epochSize), epochSize
    return function(batch)
       if nSampled >= epochSize then
-         self.log.trace('nSample reach end')
+         self.log:trace('nSample reach end')
          return false
       end
       -- sulotion: we need to ensure the batch_size is consistence, 
@@ -56,16 +56,16 @@ function InorderSampler:sampleEpoch(dataset)
       end
       
       -- get batch, reused the batch, if not create one 
-     if batch.IsBatch then 
+     if batch and batch.IsBatch then 
           assert(batch.IsFilled()) -- must be filled whtn inited
       else
-         self.log.trace('\t InitBatchWithSize: ', self._batch_size)
+         self.log:trace('\t InitBatchWithSize: ', self._batch_size)
          batch = dataset:InitBatchWithSize(self._batch_size)
       end
 
       -- batch in init already, calling sub will fill the data 
       -- into batch._inputs and batch._targets
-      self.log.trace('\t calling FillBatchOrderSample')
+      self.log:trace('\t calling FillBatchOrderSample')
       dataset:FillBatchOrderSample(batch, self._start, stop_sampleid)
       
       -- get empty indices, reuse indices tensor for resetting
@@ -78,11 +78,11 @@ function InorderSampler:sampleEpoch(dataset)
          -- indices of the samples of batch in dataset 
       }
       -- data preprocesses, if no return batch 
-      self.log.trace('\t ppf batch')
+      self.log:trace('\t ppf batch')
       batch = self._ppf(batch)
 
       --[[ increment global self_start ]]--
-      nSampled = nSampled + stop - self._start + 1
+      nSampled = nSampled + stop_sampleid - self._start + 1
       self._start = self._start + self._batch_size
       if self._start >= nSample then
          self._start = 1
@@ -94,18 +94,19 @@ function InorderSampler:sampleEpoch(dataset)
 end
 
 ------------------------------------------------------------------------
+-- for multithreading, batch are init in the first multithread setting
 -- multithreading version of sampling iterators for one epoch
 -- used with datasets that support asynchronous iterators like ImageClassSet
 -- return a function object, call by(batch, putOnly)
 ------------------------------------------------------------------------
 function InorderSampler:sampleEpochAsync(dataset)
-   self.log.trace('requests iterator')
+   self.log:trace('requests iterator')
    assert(dataset.isDataSet)
    -- dataset = dp.Sampler.toDataset(dataset)
    -- variable as control for multithreading
    local nSample = dataset:nSample()
    if not self._epoch_size then 
-       self.log.error('epoch size not set!', self._epoch_size, ' set to be nSample', nSample)
+       self.log:error('epoch size not set!', self._epoch_size, ' set to be nSample', nSample)
        self._epoch_size = nSample 
    end
    local epochSize = self._epoch_size
@@ -117,10 +118,10 @@ function InorderSampler:sampleEpochAsync(dataset)
    local StartThreadSampleBatch = function()
         -- do nothing if the Sampled Get intotal is enough for the epoch
        if nSampledGet >= epochSize then
-           self.log.trace('nSample reach end')
+           self.log:trace('nSample reach end')
            return false 
        else
-           self.log.slience('get', nSampledGet ,' ', epochSize)
+           self.log:slience('get', nSampledGet ,' ', epochSize)
        end
        stop_sampleid = self._start + self._batch_size - 1
        if stop_sampleid > nSample then
@@ -135,7 +136,7 @@ function InorderSampler:sampleEpochAsync(dataset)
        -- batch should be init in AsyncAddOrderSampleJob, 
        -- #epoch_num batch will be inited then next epoch will reused them 
        -- from buffer_batch
-       self.log.trace('setup callback_func')
+       self.log:trace('setup callback_func')
        local callback_func = function(batch)
            -- metadata
            batch:setup {
@@ -144,7 +145,7 @@ function InorderSampler:sampleEpochAsync(dataset)
            }
            batch = self._ppf(batch)
        end
-       self.log.trace('calling AsyncAddOrderSampleJob: ')
+       self.log:trace('calling AsyncAddOrderSampleJob: ')
        dataset:AsyncAddOrderSampleJob(batch, self._start, stop_sampleid, 
           callback_func)
        --[[ increment self_start ]]--

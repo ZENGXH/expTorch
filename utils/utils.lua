@@ -1,4 +1,4 @@
-local log = dp.log -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+local log = dp.log() -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
 function string.tomodule(modulename,splitter)
    splitter = splitter or '[.]'
    assert(type(modulename) == 'string')
@@ -253,7 +253,6 @@ end
 
 function Queue:empty()
    local isEmpty = (self.first > self.last)
-   log.tracefromfrom('Queue empty? ', isEmpty)
    return isEmpty
 end
  

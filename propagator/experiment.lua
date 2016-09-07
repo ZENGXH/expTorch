@@ -1,4 +1,4 @@
-------------------------------------------------------------------------
+----------------------------------------------------------------------
 --[[ Experiment ]]--
 -- An experiment propagates DataSets through Models. The specifics 
 -- such propagations are handled by Propagators. The propagation of 
@@ -13,7 +13,7 @@
 -- to sub-objects during propagation in case they need to act upon 
 -- data found in other branches of the experiment tree.
 ------------------------------------------------------------------------
-local Experiment = torch.class("dp.Experiment")
+local Experiment, parent = torch.class("dp.Experiment", "dp.Module")
 Experiment.isExperiment = true
 
 function Experiment:__init(config)
@@ -53,8 +53,10 @@ function Experiment:__init(config)
     )
     self:randomSeed(random_seed)
     self:id(id or dp.ObjectID(dp.uniqueID()))
-    self.log = dp.log -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-    self.log.SetLoggerName('exp')
+    -- self.log: dp.log() -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+    -- self.log:SetLoggerName('exp')
+    args.name = args.name or 'exp'
+    parent.__init(self, args)
     self:model(model)
     self:epoch(epoch)
     self:observer(observer)
@@ -119,28 +121,29 @@ function Experiment:run(datasource, once)
     local atleastonce = false
     repeat
         self._epoch = self._epoch + 1
-        self.log.trace('start epoch: ', self._epoch)
+        self.log:trace('start epoch: ', self._epoch)
+
         if self._optimizer and train_set then
-            self.log.trace('[[optimizer propagateEpoch]]')
+            self.log:trace('[[optimizer propagateEpoch]]')
             self._optimizer:propagateEpoch(train_set, report)
-            self.log.trace('optimizer propagateEpoch done')
+            self.log:trace('optimizer propagateEpoch done')
         end
         if self._validator and valid_set then
-            self.log.trace('[[validator propagateEpoch]]')
+            self.log:trace('[[validator propagateEpoch]]')
             self._validator:propagateEpoch(valid_set, report)
-            self.log.trace('validator propagateEpoch done')
+            self.log:trace('validator propagateEpoch done')
         end
         if self._tester and test_set then
-            self.log.trace('[[tester propagateEpoch]]')
+            self.log:trace('[[tester propagateEpoch]]')
             self._tester:propagateEpoch(test_set, report)
-            self.log.trace('tester propagateEpoch done')
+            self.log:trace('tester propagateEpoch done')
         end
-        self.log.trace('collecting report')
+        self.log:trace('collecting report')
         report = self:report()
         self._mediator:publish("doneEpoch", report)
         atleastonce = true
     until (self:isDoneExperiment() or self._epoch >= self._max_epoch or (once and atleastonce))
-    self.log.info('finish all epoch')
+    self.log:info('finish all epoch')
     self._mediator:publish("finalizeExperiment")
 end
 
@@ -184,7 +187,7 @@ function Experiment:name()
 end
 
 function Experiment:model(model)
-    self.log.info('get model: ', model)
+    self.log:info('get model: ', model)
     if model then
         assert(torch.isTypeOf(model, 'nn.Module'), 
         "Expecting nn.Module instance")
@@ -304,24 +307,24 @@ function Experiment:silent()
 end
 
 function Experiment:type(new_type)
-    self.log.info('Experiment: set new as :', new_type)
+    self.log:info('Experiment: set new as :', new_type)
     self._model:mediumSerial(false)
     if self._model then
-        self.log.info('\t reset model as :', new_type)
+        self.log:info('\t reset model as :', new_type)
         self._model:type(new_type)
     end
     if self._optimizer then
-        self.log.info('\t reset optimizer as :', new_type)
+        self.log:info('\t reset optimizer as :', new_type)
         assert(self._optimizer.isPropagator)
         self._optimizer:type(new_type)
     end
     if self._validator then
         assert(self._validator.isPropagator)
-        self.log.info('\t reset validator as :', new_type)
+        self.log:info('\t reset validator as :', new_type)
         self._validator:type(new_type)
     end
     if self._tester then
-        self.log.info('\t reset tester as :', new_type)
+        self.log:info('\t reset tester as :', new_type)
         self._tester:type(new_type)
     end
 end

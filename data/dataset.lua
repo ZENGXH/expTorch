@@ -75,15 +75,15 @@ end
 -- if reset may ??
 ------------------------------------------------------------------
 function DataSet:SetOutputShape(output_shape)
-    self.log.info('orignal shape in ', self._input_shape, ' out: ', self.output_shape)
+    self.log:info('orignal shape in ', self._input_shape, ' out: ', self.output_shape)
     self._output_shape = output_shape or self._output_shape
-    self.log.info('changed into: shape in ', self._input_shape, ' out: ', self.output_shape)
+    self.log:info('changed into: shape in ', self._input_shape, ' out: ', self.output_shape)
 end
 
 function DataSet:SetInputShape(input_shape)
-    self.log.info('orignal shape in ', self._input_shape, ' out: ', self.output_shape)
+    self.log:info('orignal shape in ', self._input_shape, ' out: ', self.output_shape)
     self._input_shape = input_shape or self._input_shape
-    self.log.info('changed into: shape in ', self._input_shape, ' out: ', self.output_shape)
+    self.log:info('changed into: shape in ', self._input_shape, ' out: ', self.output_shape)
 end
 
 function DataSet:GetInputShape()
@@ -119,13 +119,13 @@ function DataSet:sub(batch, start, stop)
          stop = start
          start = batch
       end
-      self.log.trace('building batch with size ', self:nSample())
+      self.log:trace('building batch with size ', self:nSample())
       -- get a DataView Contains sub_data from start to stop of the orignal inputs
     assert(start > 0 and stop > start)
     local batch = self:CreateEmptyBatchIfNil()
     return self:FillBatchWithSub(batch, start, stop)
   end
-   self.log.trace('dataset: sub from ', start, ' to ', stop)
+   self.log:trace('dataset: sub from ', start, ' to ', stop)
    return self:FillBatchWithSub(batch, start, stop)
 end
 
@@ -167,7 +167,7 @@ function DataSet:FillBatchWithSize(batch, batch_size)
 end
 
 function DataSet:batch(batch_size)
-   self.log.trace('calling batch with batch_size: ', batch_size)
+   self.log:trace('calling batch with batch_size: ', batch_size)
     assert(batch_size > 0)
     return self:InitBatchWithSize(batch_size)
 end

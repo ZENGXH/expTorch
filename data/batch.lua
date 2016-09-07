@@ -37,7 +37,7 @@ end
 
 
 function Batch:SetCuda()
-    self.log.fatal('\t\t SetCuda, can be reremove?')
+    self.log:fatal('\t\t SetCuda, can be reremove?')
     -- self:GetView('input'):SetCuda()
     -- self:GetView('target'):SetCuda()
 end
@@ -58,7 +58,7 @@ function Batch:setup(config)
 end
 
 function Batch:reset(config)
-   self.log.tracefrom('batch is setup')
+   self.log:tracefrom('batch is setup')
    assert(type(config) == 'table', "Setup requires key-value arguments")
    local args
    args, self._batch_iter, self._batch_size, self._n_sample, 

@@ -69,7 +69,7 @@ function ImageClassSet:__init(config)
 
    local cacheExists = paths.filep(self._cache_path)
    
-    self.log.info(' cache_mode: ', args.cache_mode)
+    self.log:info(' cache_mode: ', args.cache_mode)
    if args.cache_mode == 'readonly' or (args.cache_mode == 'writeonce' and args.cacheExists) then
       if not cacheExists then
          error("'readonly' cache_mode requires an existing cache, none found in "..self._cache_path)
@@ -292,7 +292,7 @@ function ImageClassSet:buildIndex()
 end
 
 function ImageClassSet:batch(batch_size)
-   self.log.tracefrom('request batch with size ', batch_size)
+   self.log:tracefrom('request batch with size ', batch_size)
    return dp.Batch{
       which_set=self._which_set,
       inputs=dp.ImageView('bchw', 
@@ -600,7 +600,7 @@ function ImageClassSet:multithread(nThread)
    
    local threads = require "threads"
    threads.Threads.serialization('threads.sharedserialize')
-   self.log.info('init threads with dataset: ', self._class_set)
+   self.log:info('init threads with dataset: ', self._class_set)
    self._threads = threads.Threads(
       nThread,
       -- all function below will be executed in all thread
@@ -615,7 +615,7 @@ function ImageClassSet:multithread(nThread)
          math.randomseed(seed)
          torch.manualSeed(seed)
          if config.verbose then
-            self.log.info(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
+            self.log:info(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
          end
          dataset = dp[self._class_set](config)
 
@@ -686,18 +686,18 @@ function ImageClassSet:subAsyncPut(batch, start, stop, callback)
 end
 
 function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
-   self.log.info('[sampleAsyncPut] with view in ', self._input_shape, ' for nSample ', nSample)
+   self.log:info('[sampleAsyncPut] with view in ', self._input_shape, ' for nSample ', nSample)
    self._iter_mode = self._iter_mode or 'sample'
    if (self._iter_mode ~= 'sample') then
       error'can only use one Sampler per async ImageClassSet (for now)'
    end  
    
    if not batch or batch == nil then
-      self.log.trace('batch is nil size of buffer_batches: ', self._buffer_batches:length() )
+      self.log:trace('batch is nil size of buffer_batches: ', self._buffer_batches:length() )
       batch = (not self._buffer_batches:empty()) and self._buffer_batches:get() or self:batch(nSample)
-      self.log.trace('batch is now not nil')
+      self.log:trace('batch is now not nil')
    else
-       self.log.trace('batch is nil')
+       self.log:trace('batch is nil')
    end
 
    local input = batch:inputs():input()
@@ -710,18 +710,18 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
    local targetPointer = tonumber(ffi.cast('intptr_t', 
         torch.pointer(target:storage())))
  
-   self.log.trace('get target pointer')
+   self.log:trace('get target pointer')
    local inputPointer = tonumber(ffi.cast('intptr_t', 
         torch.pointer(input:storage())))
-   self.log.trace('get input pointer')
+   self.log:trace('get input pointer')
    input:cdata().storage = nil
    target:cdata().storage = nil
    
    self._send_batches:put(batch)
     
-   self.log.trace('put batch')
+   self.log:trace('put batch')
    assert(self._threads:acceptsjob())
-   self.log.trace('start add job')
+   self.log:trace('start add job')
    self._threads:addjob(
       -- the job callback (runs in data-worker thread)
       function()
@@ -759,7 +759,7 @@ function ImageClassSet:sampleAsyncPut(batch, nSample, sampleFunc, callback)
          batch:targets():forward('b', target)
          callback(batch)
          batch:targets():setClasses(self._classes)
-         -- self.log.trace('putting to _recv_batches: ', #self._recv_batches)
+         -- self.log:trace('putting to _recv_batches: ', #self._recv_batches)
          self._recv_batches:put(batch)
          
       end
@@ -769,7 +769,7 @@ end
 -- recv results from worker : get results from queue
 function ImageClassSet:asyncGet()
    -- necessary because Threads:addjob sometimes calls dojob...
-   self.log.info('asyncGet is called')
+   self.log:info('asyncGet is called')
    if self._recv_batches:empty() then
       self._threads:dojob()
    end

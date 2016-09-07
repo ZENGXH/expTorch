@@ -10,12 +10,12 @@ DataView.isDataView = true
 function DataView:__init(view, input, name)
    local name = name or 'DataView'
    parent.__init(self, name)
-   self.log.trace(name, ' view init with view ', view)
+   self.log:trace(name, ' view init with view ', view)
    self._is_data_filled = false
    assert(view and input)
    -- require when init
    if view and input then
-      self.log.trace('\t calling forward')
+      self.log:trace('\t calling forward')
       self:forward(view, input)
    end
    self._module_graph = {}
@@ -47,7 +47,7 @@ end
 --      {['torch.DoubleTensor'] = nn.Identity()}}}
 -----------------------------------------------------------------------
 function DataView:forwardPut(view, input)
-   self.log.trace('[DataView] fw PUT view: ', view, 
+   self.log:trace('[DataView] fw PUT view: ', view, 
       ' with tensor size: ', dp.helper.PrintSize(input))
    -- store input for later use
    self._dim = #view -- eg #'bhwc' = 4
@@ -74,7 +74,7 @@ end
 -- This method could be called from multiple output Models
 -- return the tensor from the self._tensor by key'view' and key'tensor_type'
 function DataView:forwardGet(view, tensor_type)
-   self.log.tracefrom('require view: ', view, ' with tensor_type: ', tensor_type)
+   self.log:tracefrom('require view: ', view, ' with tensor_type: ', tensor_type)
    self._got = true
    tensor_type = tensor_type or self._type
    -- retrieve a viewTable
@@ -415,7 +415,7 @@ end
 
 -- flush module and tensor cache
 function DataView:flush()
-   self.log.trace('flush dataview')
+   self.log:trace('flush dataview')
    self._tensors = {}
    self._modules = nil
    self._module_graph = {}
@@ -531,7 +531,7 @@ function DataView:ipairsSub(batchSize, inplace, reuse)
 end
 
 function DataView:type(type)
-   self.log.info('dataView type reset type as', type)
+   self.log:info('dataView type reset type as', type)
    self:flush()
    self:forwardPut(nil, self._input:type(type))
 end
@@ -565,7 +565,7 @@ function DataView:input(input)
       self:SetInputTensor(input)
       return 
    end
-   self.log.tracefrom('requiring views input')
+   self.log:tracefrom('requiring views input')
    return self:GetInputTensor()
 end
 
@@ -574,8 +574,8 @@ end
 function DataView:transpose(new_view)
    local view = _.split(self._view)
    local transpositions = {}
-   -- self.log.tracefrom('\t get empty')
-   -- self.log.trace('calling Transpose from '..self._view..' to '..new_view)
+   -- self.log:tracefrom('\t get empty')
+   -- self.log:trace('calling Transpose from '..self._view..' to '..new_view)
    for i=1, #new_view do
       local j = _.indexOf(view, new_view:sub(i,i))
       if i ~= j then

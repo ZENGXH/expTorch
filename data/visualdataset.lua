@@ -49,7 +49,7 @@ end
 -- @return: batchsize inited wich 
 ------------------------------------------------------------------------
 function VisualDataSet:InitBatchWithSize(batch_size)
-   self.log.tracefrom('request batch with size ', batch_size, ' sample_size(input) ', unpack(self._input_shape_set))
+   self.log:tracefrom('request batch with size ', batch_size, ' sample_size(input) ', unpack(self._input_shape_set))
    assert(torch.type(batch_size) == 'number' and batch_size > 0)
    local batch = self:CreateEmptyBatchIfNil()
    assert(batch.isBatch and not batch:IsFilled())
@@ -117,7 +117,7 @@ end
 ------------------------------------------------------------------------
 
 function VisualDataSet:multithread(nThread,batch_size)
-   self.log.info('get multithread: ', nThread, ' b ', batch_size)
+   self.log:info('get multithread: ', nThread, ' b ', batch_size)
    assert(nThread > 0 and  batch_size > 0)
    local nThread = nThread or 2
    assert(batch_size and batch_size > 0, 'batch_size required')
@@ -133,25 +133,26 @@ function VisualDataSet:multithread(nThread,batch_size)
    local threads = require "threads"
    local batch_size = batch_size
    threads.Threads.serialization('threads.sharedserialize')
-   self.log.info('init threads with dataset: ', self._class_set)
+   self.log:info('init threads with dataset: ', self._class_set)
 
    self._threads = threads.Threads(
    nThread,
    -- all function below will be executed in all thread
    function() -- make a separated f1 containing all the definitions 
-      -- print('threading')
       require 'dprnn.dprnn'
+      print('done')
    end,
    function(idx) -- other code in f2
+      print('start')
       opt = options -- pass to all donkeys via upvalue
       tid = idx
       local seed = mainSeed + idx
       math.randomseed(seed)
       torch.manualSeed(seed)
-      -- self.log.info('..')
-      -- self.log.info(string.format('Starting worker thread with id: %d seed: %d', tid, seed), 
-      --  'setup class_set: ', self._class_set, ' with batch_size ', batch_size)
+      print(string.format('Starting worker thread with id: %d seed: %d', tid, seed))
+      print('build dataset')
       dataset = dp[self._class_set](config)
+      print('init batch_size')
       tbatch = dataset:InitBatchWithSize(batch_size)
    end
    )
@@ -178,7 +179,7 @@ end
 -- @param callback
 ------------------------------------------------------------------------
 function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)   
-   self.log.trace('i am adding job')
+   self.log:trace('i am adding job')
    if not batch or (batch and batch.isBatch and batch.IsFilled()) then
       -- buffer_batches are filled in :synchronize() by batch in _recv_batches
       local batch_size_cur = stop - start + 1
@@ -191,7 +192,7 @@ function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)
    self._send_batches:put(batch)
    local _input_shape = self._input_shape
    local _output_shape = self._output_shape
-   self.log.trace('_input_shape: ', self._input_shape)
+   self.log:trace('_input_shape: ', self._input_shape)
    
    -- the job callback (runs in data-worker thread)
    local worker_job = function() 
@@ -222,9 +223,9 @@ function VisualDataSet:AsyncAddOrderSampleJob(batch, start, stop, callback)
       batch:GetView('target'):setClasses(self._classes)
       self._recv_batches:put(batch)
    end
-   self.log.trace('add job to thread:')
+   self.log:trace('add job to thread:')
    self._threads:addjob(worker_job, main_thread_job)
-   self.log.trace('add job success')
+   self.log:trace('add job success')
 end
 
 function VisualDataSet:AsyncAddRandomSampleJob(batch, batch_size, sample_func, callback)
@@ -236,18 +237,18 @@ function VisualDataSet:AsyncAddRandomSampleJob(batch, batch_size, sample_func, c
    local targetPointer = tonumber(ffi.cast('intptr_t', 
    torch.pointer(target:storage())))
 
-   self.log.trace('get target pointer')
+   self.log:trace('get target pointer')
    local inputPointer = tonumber(ffi.cast('intptr_t', 
    torch.pointer(input:storage())))
-   self.log.trace('get input pointer')
+   self.log:trace('get input pointer')
    input:cdata().storage = nil
    target:cdata().storage = nil
 
    self._send_batches:put(batch)
 
-   self.log.trace('put batch')
+   self.log:trace('put batch')
    assert(self._threads:acceptsjob())
-   self.log.trace('start add job')
+   self.log:trace('start add job')
    local view = self._input_shape
 
    -- the job callback (runs in data-worker thread)
@@ -281,7 +282,7 @@ function VisualDataSet:AsyncAddRandomSampleJob(batch, batch_size, sample_func, c
       callback(batch) 
       --callback: setup batch and run sampler's ppf on batch, view may be changed
       batch:targets():setClasses(self._classes)
-      -- self.log.trace('putting to _recv_batches: ', #self._recv_batches)
+      -- self.log:trace('putting to _recv_batches: ', #self._recv_batches)
       self._recv_batches:put(batch)
    end  
 
@@ -307,7 +308,7 @@ end
 -- recv results from worker : get results from queue
 function VisualDataSet:asyncGet()
    -- necessary because Threads:addjob sometimes calls dojob...
-   self.log.trace('asyncGet is called')
+   self.log:trace('asyncGet is called')
    if self._recv_batches:empty() then
       self._threads:dojob()
    end

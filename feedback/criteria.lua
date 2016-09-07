@@ -45,7 +45,7 @@ function Criteria:__init(config)
    for k,v in pairs(criteria) do
       -- non-list items only
       -- if type(k) ~= 'number' then
-         self.log.trace('insert criteria: ', v, self._output_module[k])
+         self.log:trace('insert criteria: ', v, self._output_module[k])
          self._criteria[k] = v
          self._output_module[k] = args.output_module[k] or nn.Identity()
       -- end
@@ -56,12 +56,12 @@ function Criteria:__init(config)
    end
    self._errors = {}
    self:reset()
-   self.log.tracefrom('Criteria setup done')
+   self.log:tracefrom('Criteria setup done')
 end
 
 function Criteria:_reset()
    -- reset error sums to zero
-   self.log.info('resetting: ', self._criteria)
+   self.log:trace('resetting: ', self._criteria)
    for k, v in pairs(self._criteria) do
       self._errors[k] = 0
    end
@@ -71,7 +71,7 @@ function Criteria:_add(batch, output,  report)
    local current_error
    for k, v in pairs(self._criteria) do
       -- current_error = v:forward(output.act:data(), batch:targets():data())
-      self.log.trace('forward ', v)      
+      self.log:trace('forward ', v)      
       local new_output = self._output_module[k]:forward(output)
       local tgt = batch:GetView('target'):forwardGet('b'):type(self.tensorType)
       current_error = v:forward(new_output, tgt)

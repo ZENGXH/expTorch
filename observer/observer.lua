@@ -12,7 +12,7 @@
 -- received report, but then the ordering of these modifications would
 -- be undefined, unless they make use of Mediator priorities.
 ------------------------------------------------------------------------
-local Observer = torch.class("dp.Observer")
+local Observer, parent = torch.class("dp.Observer", "dp.Module")
 Observer.isObserver = true
 
 -----------------------------------------------------------------------
@@ -20,7 +20,25 @@ Observer.isObserver = true
 -- @param channels: string | table eg. "doneEpoch"
 -- @param callbacks: string | table, f not given, same with channels
 -----------------------------------------------------------------------
-function Observer:__init(channels, callbacks)
+function Observer:__init(config, ...)
+   local args = {}
+   if type(config) ~= 'table' then
+       local args = {...}
+       local config_ = {}
+       config_.channels = config
+       config_.callbacks = args[1]
+       config = config_ 
+   end
+   config = config or {}
+   print('unpack: ', config)
+   dp.helper.unpack_config(args, {config}, 'observer',
+      'Observer for Experiment',
+      {arg='channels', type="string | table", 
+      help='channels'},
+      {arg='callbacks', type="string | table", 
+      help='callbacks'},
+      {arg='name', type='string', req=true, help='name of Observer'}
+   )
    if type(channels) == 'string' then
       channels = {channels}
    end
@@ -29,8 +47,10 @@ function Observer:__init(channels, callbacks)
    end
    self._channels = channels or {}
    self._callbacks = callbacks or channels
-   self.log = dp.log -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.SetLoggerName('Observer')
+   args.name = args.name or 'obs'
+   parent.__init(self, args)
+   -- self.log:= dp.log() -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   -- self.log:SetLoggerName('Observer')
 end
 
 -----------------------------------------------------------------------
@@ -90,5 +110,5 @@ function Observer:doneEpoch(report, ...)
 end
 
 function Observer:doneBatch(report, ...)
-    self.log.trace('not implement')
+    self.log:trace('not implement')
 end

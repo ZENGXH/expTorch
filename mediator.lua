@@ -1,5 +1,3 @@
-local log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-log.SetLoggerName('Mediator')
 ------------------------------------------------------------------------
 --[[ Subscriber ]]--
 -- Used by Mediator. Holds a subscriber object which will be called
@@ -36,7 +34,7 @@ end
 --[[ Channel ]]--
 -- Used by Mediator. Can be published and subscribed to.
 ------------------------------------------------------------------------
-local Channel = torch.class("dp.Channel")
+local Channel, dpModule = torch.class("dp.Channel", "dp.Module")
 Channel.isChannel = true
 
 -----------------------------------------------------------------------
@@ -46,6 +44,7 @@ Channel.isChannel = true
 --
 -----------------------------------------------------------------------
 function Channel:__init(namespace, parent)
+    dpModule.__init(self, {name="Channel"})
     self.stopped = false
     self.namespace = namespace
     self.callbacks = {}
@@ -120,7 +119,7 @@ function Channel:publish(channelNamespace, ...)
       -- if it doesn't have a predicate, or it does and it's true then run it
       if not callback.options.predicate or callback.options.predicate(...) then
          --print(torch.typename(callback.subscriber), callback.func_name)
-         log.trace('publishing', callback,func_name)
+         self.log:trace('publishing', callback,func_name)
          callback.subscriber[callback.func_name](callback.subscriber, ...)
       end
    end

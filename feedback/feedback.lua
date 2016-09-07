@@ -7,10 +7,11 @@
 -- When serialized with the model, they may also be unserialized to
 -- generate graphical reports (see Confusion).
 ------------------------------------------------------------------------
-local Feedback = torch.class("dp.Feedback")
+local Feedback, parent = torch.class("dp.Feedback", "dp.Module")
 Feedback.isFeedback = true
 
 function Feedback:__init(config)
+
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args = {}
    dp.helper.unpack_config(args,{config},
@@ -23,8 +24,10 @@ function Feedback:__init(config)
       {arg='name', type='string', req=true,
        help='used to identify report'}
    )
-   self.log = dp.log --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-   self.log.SetLoggerName(args.name)
+
+   parent.__init(self, args)
+   -- self.log:= dp.log() --loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+   -- self.log:SetLoggerName(args.name)
    self.tensorType = dp.DefaultTensorType -- 'torch.DoubleTensor' -- by default
    self.cuda = false
    self.num_batch_record = 0
@@ -73,13 +76,13 @@ function Feedback:add(batch, output, report)
    if torch.type(output) == 'torch.CudaTensor' then
        feed_output = output:float()
    end]]--
-   self.log.trace('Feedback receiver report:', report)
+   self.log:trace('Feedback receiver report:', report)
    assert(torch.isTypeOf(batch, 'dp.Batch'), "First argument should be dp.Batch")
    self.num_batch_record = self.num_batch_record + 1
    self._n_sample = self._n_sample + batch:nSample()
    if self.selected_output ~= 0 and torch.isTypeOf(output, 'table') then
        error('deprecidate about selected_output')
-       self.log.trace('selected_output is used')
+       self.log:trace('selected_output is used')
        dp.helper.Assertlet(self.selected_output, #output, 'selected_output too large')
        self:_add(batch, output[self.selected_output], report)
     else
