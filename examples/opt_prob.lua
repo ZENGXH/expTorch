@@ -63,7 +63,7 @@ opt.log_name = opt.snapshot_prefix..'.log'
 opt.uniform = 0.003 -- 'initialize parameters using uniform distribution between -uniform and uniform. -1 means default initialization')
 opt.progress = true-- 'print progress bar')
 opt.silent = false-- 'dont print anything to stdout')
-opt.nThread = 1
+opt.nThread = -1
 opt.seed = 1
 opt.verbose=true
 opt.cache_mode='overwrite'
@@ -73,28 +73,28 @@ opt.loss_display_iter = 50
 opt.cont_iter = 0
 opt.max_iterations = 30000
 --[[ dataSource ]]--
-opt.feature_size = 1024
+opt.feature_size = 101
 opt.feature_h = 1
 opt.feature_w = 1 
 opt.parameters_init = 0.003
 opt.num_selection = 1 
-opt.load_size={1, 1024, 1, 1}
-opt.sample_size={1024, 1, 1}
-opt.input_type='flow'
+opt.load_size={1, 101, 1, 1}
+opt.sample_size={101, 1, 1}
+opt.input_type='rgb'
 
 opt.classID_file='/data1/wangjiang/datasets/ucf101_list/ClassID_ucf101.txt'
-opt.data_train_list='/data1/zengxiaohui/experiment/action_data/ucf101_list/train_list_split1.txt'
 opt.data_test_list='/data1/zengxiaohui/experiment/action_data/ucf101_list/test_list_split1.txt'
+opt.data_train_list=opt.data_test_list -- '/data1/zengxiaohui/experiment/action_data/ucf101_list/train_list_split1.txt'
 opt.data_root='/data1/zengxiaohui/experiment/action_data/ucf101'
-opt.data_folder='seg5_video'
+opt.data_folder='prob_whole_vid'
 opt.frames_per_select_train=1
 
 -- GPU/CPU
-opt.cuda = true -- false --true -- true -- 'use CUDA')
+opt.cuda = false --true -- true -- 'use CUDA')
 opt.time = 0 --print batch times
 opt.cudnn = 1 --use cudnn (1=yes). this should greatly speed up convolutions
 opt.device_id = 2
 
 --[[ task info ]]--
 opt.num_class = 101
-return opt
+return  opt

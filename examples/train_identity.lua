@@ -9,13 +9,13 @@ local args = cmd:parse(arg)
 print('get args: ', args.c)
 local optfile = args.c 
 assert(optfile)
-log = loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
-log.SetLoggerName('main')
-log.info('loading optfile: ', optfile)
+local log= dp.log() -- loadfile(paths.concat(dp.DPRNN_DIR, 'utils', 'log.lua'))()
+log:SetLoggerName('main')
+log:info('loading optfile: ', optfile)
 
 local opt = dofile(optfile)
 torch.setnumthreads(opt.nThread)
-log.info('loading optfile done ')
+log:info('loading optfile done ')
 log.outfile = opt.log_name or 'train.log'
 torch.manualSeed(opt.seed)
 if opt.cuda then
@@ -30,6 +30,7 @@ dp.DATA_DIR='/data1/zengxiaohui/experiment/action_data/ucf101'
 assert(opt.classID_file)
 assert(opt.frames_per_select_train)
 local ds = dp.UCF101{
+    is_test_only=true,
     load_all = true,
     load_size=opt.load_size, -- {1, 1024, 1, 1},
     sample_size=opt.sample_size, --{1024, 1, 1},
@@ -48,24 +49,17 @@ local ds = dp.UCF101{
     frames_per_select_train=opt.frames_per_select_train,--1,
     cache_mode=opt.cache_mode --'writeonce',
 }
-local Model_dict = dofile('model/video_model.lua') 
-model = Model_dict.GlimpseH1(opt, ds)
-print"Model :"
-print(model)
- model.agent = agent
--- torch.save('model.t7', model)
--- 
--- model = torch.load('model.t7')
-assert(model and torch.isTypeOf(model, 'nn.Module'))
 
+local model = nn.Sequential()
+    :add(nn.View(opt.batch_size, 101))
+    :add(nn.Identity())
+
+local para, grad = model:getParameters()
+para:uniform(-0.003, 0.003)
 --[[ criterion ]]--
 -- criterion for backward
-local VRC_module = nn.ModuleCriterion(nn.VRClassReward(model, opt.rewardScale), nil, nil)
 local Entropy_module = nn.ModuleCriterion(nn.ClassNLLCriterion(), nn.Log(), nil)
-local criterion = nn.ParallelCriterion(true)
-    :add(Entropy_module) -- BACKPROP
-    :add(VRC_module) -- REINFORCE
-
+local criterion = Entropy_module
 
 assert(ds and ds ~= nil)
 
@@ -80,13 +74,13 @@ local feedback_conf = dp.Confusion{
     name='classication_acc',
     bce=false, 
     target_dim=-1, 
-    output_module=nn.Sequential():add(nn.SelectTable(1))
+    -- output_module=nn.Sequential():add(nn.SelectTable(1))
 }
 local feedback_rego_loss = dp.Criteria({
     name='classication_loss',
     criteria={criterion_show},
     output_to_report=true,
-    output_module = {nn.SelectTable(1)},
+    -- output_module = {nn.SelectTable(1)},
 })
 local composeFeedback = dp.CompositeFeedback{
     name='compose_feedback',
@@ -95,23 +89,16 @@ local composeFeedback = dp.CompositeFeedback{
 
 --[[ ppf ]]--
 opt.ppf = function(batch) --#TODO only for ucf101 , moved into it
-   --[[
-    local inputView = batch:GetView('input')
-    assert(inputView:view() == 'btchw')
-    local input = inputView:GetInputTensor()
-    inputView:forwardPut('btcw', input:select(4, 1))
-    batch:SetView('input', inputView)
-    ]]--
     return batch
 end
 --[[ Propagators ]]--
 local PrinterObserverConfig = {
         name='train_printer',
         channels='printer',
-        display_interval=20
+        display_interval=10
     }
 
---[ train Propagators ]--
+--[[ train Propagators ]]--
 train = dp.Optimizer{
     observer=dp.PrinterObserver(PrinterObserverConfig),
     stats = true,
@@ -148,7 +135,7 @@ test = dp.Evaluator{
     feedback = composeFeedback, 
     sampler = dp.InorderSampler{
         batch_size=opt.batch_size, 
-        epoch_size=opt.train_epoch_size,
+        epoch_size= -1, --opt.train_epoch_size,
         ppf=opt.ppf
     }
 }
@@ -157,15 +144,14 @@ test = dp.Evaluator{
 ]]--
 --[[multithreading]]--
 if opt.nThread > 0 then
-    log.info('setting multithread as ', opt.nThread, 
+    log:info('setting multithread as ', opt.nThread, 
     ' with batch_size', opt.batch_size)
     -- dp.VisualDataSet.multithread(ds, opt.nThread, opt.batch_size) --opt.batch_size)
     ds:multithread(opt.nThread, opt.batch_size) --opt.batch_size)
-
     train:sampler():async()
     test:sampler():async()
 else
-    log.info('not using multithread')
+    log:info('not using multithread')
 end
 
 
@@ -175,11 +161,12 @@ xp = dp.Experiment{
     stats = true,
     verbose = true,
     model = model,
+    is_test_only=true,
     optimizer = train,
     tester = test,
     --[[
     observer = {
-        dp.FileLogger(),
+        dp.Filelog:er(),
         dp.EarlyStopper{
             error_report = {'validator', 'feedback', 'classication_loss'},
             maximize = true,
@@ -193,9 +180,9 @@ xp = dp.Experiment{
 
 --[[GPU or CPU]]--
 if opt.cuda then
-    log.info('cuda mode')
-    log.info('setDevice: ', opt.device_id)
-    log.info('setting cuda')
+    log:info('cuda mode')
+    log:info('setDevice: ', opt.device_id)
+    log:info('setting cuda')
     xp:cuda()
 end
 
@@ -219,4 +206,4 @@ assert(target)
 ]]--
 xp:run(ds)
 
--- vim:ts=3 ss=3 sw=3 expandtab
+
